@@ -1,122 +1,93 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import GuestRoute from './components/GuestRoute';
+import ProtectedRoute from './components/ProtectedRoute';
+import Toast from './components/Toast';
+import { AuthProvider } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import AdminLayout from './layouts/AdminLayout';
+import AuthLayout from './layouts/AuthLayout';
+import UserLayout from './layouts/UserLayout';
+import OverviewPage from './pages/AdminPages/OverviewPage';
+import SignInPage from './pages/AuthPages/SignInPage';
+import SignUpPage from './pages/AuthPages/SignUpPage';
+import NotFoundPage from './pages/NotFoundPage';
+import AccountEditPage from './pages/UserPages/AccountEditPage';
+import AccountsPage from './pages/UserPages/AccountsPage';
+import CategoriesPage from './pages/UserPages/CategoriesPage';
+import CategoryFormPage from './pages/UserPages/CategoryFormPage';
+import DashboardPage from './pages/UserPages/DashboardPage';
+import DebtDetailPage from './pages/UserPages/DebtDetailPage';
+import DebtEditPage from './pages/UserPages/DebtEditPage';
+import DebtsPage from './pages/UserPages/DebtsPage';
+import PaymentEditPage from './pages/UserPages/PaymentEditPage';
+import ReportsPage from './pages/UserPages/ReportsPage';
+import TransactionEditPage from './pages/UserPages/TransactionEditPage';
+import TransactionsPage from './pages/UserPages/TransactionsPage';
+import TransferEditPage from './pages/UserPages/TransferEditPage';
+import TransfersPage from './pages/UserPages/TransfersPage';
 
-function App() {
-  const [count, setCount] = useState(0)
+const router = createBrowserRouter([
+  {
+    element: <GuestRoute />,
+    errorElement: <NotFoundPage />,
+    children: [
+      {
+        element: <AuthLayout />,
+        children: [
+          { path: '/', element: <Navigate to="/auth/signin" replace /> },
+          { path: '/auth/signin', element: <SignInPage /> },
+          { path: '/auth/signup', element: <SignUpPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute />,
+    errorElement: <NotFoundPage />,
+    children: [
+      {
+        element: <UserLayout />,
+        children: [
+          { path: '/dashboard', element: <DashboardPage /> },
+          { path: '/accounts', element: <AccountsPage /> },
+          { path: '/accounts/:id/edit', element: <AccountEditPage /> },
+          { path: '/categories', element: <CategoriesPage /> },
+          { path: '/categories/new', element: <CategoryFormPage /> },
+          { path: '/categories/:id/edit', element: <CategoryFormPage /> },
+          { path: '/transactions', element: <TransactionsPage /> },
+          { path: '/transactions/:id/edit', element: <TransactionEditPage /> },
+          { path: '/transfers', element: <TransfersPage /> },
+          { path: '/transfers/:id/edit', element: <TransferEditPage /> },
+          { path: '/debts', element: <DebtsPage /> },
+          { path: '/debts/:id/edit', element: <DebtEditPage /> },
+          { path: '/debts/:id/payments/:paymentId/edit', element: <PaymentEditPage /> },
+          { path: '/debts/:id', element: <DebtDetailPage /> },
+          { path: '/reports', element: <ReportsPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute roles={['SYSTEM_ADMIN']} />,
+    errorElement: <NotFoundPage />,
+    children: [
+      {
+        path: '/admin',
+        element: <AdminLayout />,
+        children: [{ index: true, element: <OverviewPage /> }],
+      },
+    ],
+  },
+  { path: '*', element: <NotFoundPage /> },
+]);
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+const App = () => (
+  <AuthProvider>
+    <ToastProvider>
+      <Toast />
+      <RouterProvider router={router} />
+    </ToastProvider>
+  </AuthProvider>
+);
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
-}
-
-export default App
+export default App;

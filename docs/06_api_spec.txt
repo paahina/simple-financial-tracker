@@ -56,7 +56,7 @@ GET /api/accounts/get/:id
 Get one account and its balance.
 
 PUT /api/accounts/update/:id
-Update name, type, currency, or description. Initial balance cannot change.
+Update name, type, currency, description, or currentBalance. currentBalance is the amount the account should show now. The stored starting balance is adjusted so income, expenses, transfers, and debt payments still add up to that amount.
 
 DELETE /api/accounts/delete/:id
 Deactivate the account.
@@ -70,7 +70,10 @@ CATEGORIES
 
 GET /api/categories/getAllCategories
 List categories. Default income and expense categories are created on first use.
-Optional query: type=INCOME or type=EXPENSE.
+Optional query: type=INCOME or type=EXPENSE. includeInactive=true includes deactivated categories.
+
+GET /api/categories/get/:id
+One category owned by the signed-in user.
 
 POST /api/categories/create
 Create a category. Fields: name, type.
@@ -119,8 +122,11 @@ GET /api/transfers/getAllTransfers
 List transfers.
 
 POST /api/transfers/create
-Move money between two accounts owned by the user.
-Fields: fromAccountId, toAccountId, amount, description, transactionDate.
+Move money between owned accounts, in from someone else, or out to someone else.
+Fields: amount, description, transactionDate, and one owned account.
+fromAccountId or senderName is the source. toAccountId or recipientName is the destination.
+senderName adds money to the destination account only. recipientName subtracts money from the source account only.
+Both sides cannot be outside the user's accounts.
 A transfer is not income or expense.
 
 GET /api/transfers/get/:id

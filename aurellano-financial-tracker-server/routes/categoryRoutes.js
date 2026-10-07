@@ -3,6 +3,7 @@ const {
   createCategory,
   deactivateCategory,
   getAllCategories,
+  getCategoryById,
   updateCategory,
 } = require('../controllers/categoryController');
 const { protect } = require('../middleware/authMiddleware');
@@ -16,6 +17,7 @@ const router = express.Router();
 
 router.use(protect);
 router.get('/getAllCategories', getAllCategories);
+router.get('/get/:id', mongoIdParamValidation, getCategoryById);
 router.post('/create', categoryValidation, createCategory);
 router.put('/update/:id', mongoIdParamValidation, categoryUpdateValidation, updateCategory);
 router.delete('/delete/:id', mongoIdParamValidation, deactivateCategory);

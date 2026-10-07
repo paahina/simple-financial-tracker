@@ -69,7 +69,7 @@ const accountUpdateValidation = [
   body('type').optional().isIn(['CASH', 'E_WALLET', 'BANK']),
   body('currency').optional().isString().trim().isLength({ min: 3, max: 3 }),
   body('description').optional().isString().trim(),
-  body('initialBalance').optional().isInt({ min: 0 }),
+  body('currentBalance').optional().isInt({ min: 0 }),
   handleValidation,
 ];
 
@@ -107,9 +107,19 @@ const transactionUpdateValidation = [
   handleValidation,
 ];
 
+const accountIdOrEmpty = (value) => {
+  if (value == null || value === '') return true;
+  if (!/^[a-fA-F0-9]{24}$/.test(String(value))) {
+    throw new Error('Invalid account id');
+  }
+  return true;
+};
+
 const transferValidation = [
-  body('fromAccountId').isMongoId(),
-  body('toAccountId').isMongoId(),
+  body('fromAccountId').custom(accountIdOrEmpty),
+  body('senderName').optional().isString().trim().isLength({ max: 100 }),
+  body('toAccountId').custom(accountIdOrEmpty),
+  body('recipientName').optional().isString().trim().isLength({ max: 100 }),
   body('amount').isInt({ min: 1 }).withMessage('Amount must be a positive integer in centavos'),
   body('description').optional().isString().trim(),
   body('transactionDate').isISO8601(),
@@ -117,8 +127,10 @@ const transferValidation = [
 ];
 
 const transferUpdateValidation = [
-  body('fromAccountId').optional().isMongoId(),
-  body('toAccountId').optional().isMongoId(),
+  body('fromAccountId').optional().custom(accountIdOrEmpty),
+  body('senderName').optional().isString().trim().isLength({ max: 100 }),
+  body('toAccountId').optional().custom(accountIdOrEmpty),
+  body('recipientName').optional().isString().trim().isLength({ max: 100 }),
   body('amount').optional().isInt({ min: 1 }),
   body('description').optional().isString().trim(),
   body('transactionDate').optional().isISO8601(),

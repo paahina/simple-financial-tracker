@@ -10,6 +10,30 @@ const assertDifferentAccounts = (fromAccountId, toAccountId) => {
   }
 };
 
+const resolveParty = (accountId, name, missingMessage) => {
+  const id = accountId || null;
+  const label = String(name || '').trim();
+  if (id && label) {
+    throw new FinanceError('Choose an account or a name');
+  }
+  if (!id && label.length < 2) {
+    throw new FinanceError(missingMessage);
+  }
+  return { accountId: id, name: id ? '' : label };
+};
+
+const resolveParties = ({ fromAccountId, senderName, toAccountId, recipientName }) => {
+  const from = resolveParty(fromAccountId, senderName, 'Sender name is required');
+  const to = resolveParty(toAccountId, recipientName, 'Recipient name is required');
+  if (!from.accountId && !to.accountId) {
+    throw new FinanceError('One side must be one of your accounts');
+  }
+  if (from.accountId && to.accountId) {
+    assertDifferentAccounts(from.accountId, to.accountId);
+  }
+  return { from, to };
+};
+
 const getAllTransfers = async (req, res) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
@@ -38,13 +62,19 @@ const getTransferById = async (req, res) => {
 
 const createTransfer = async (req, res) => {
   try {
-    assertDifferentAccounts(req.body.fromAccountId, req.body.toAccountId);
-    await requireOwnedAccount(Account, req.user.id, req.body.fromAccountId, { active: true });
-    await requireOwnedAccount(Account, req.user.id, req.body.toAccountId, { active: true });
+    const parties = resolveParties(req.body);
+    if (parties.from.accountId) {
+      await requireOwnedAccount(Account, req.user.id, parties.from.accountId, { active: true });
+    }
+    if (parties.to.accountId) {
+      await requireOwnedAccount(Account, req.user.id, parties.to.accountId, { active: true });
+    }
     const transfer = await Transfer.create({
       userId: req.user.id,
-      fromAccountId: req.body.fromAccountId,
-      toAccountId: req.body.toAccountId,
+      fromAccountId: parties.from.accountId || undefined,
+      senderName: parties.from.name,
+      toAccountId: parties.to.accountId || undefined,
+      recipientName: parties.to.name,
       amount: Number(req.body.amount),
       description: req.body.description || '',
       transactionDate: new Date(req.body.transactionDate),
@@ -61,13 +91,22 @@ const updateTransfer = async (req, res) => {
     if (!transfer) {
       return res.status(HttpStatus.NOT_FOUND).json({ message: 'Transfer not found' });
     }
-    const fromAccountId = req.body.fromAccountId || transfer.fromAccountId;
-    const toAccountId = req.body.toAccountId || transfer.toAccountId;
-    assertDifferentAccounts(fromAccountId, toAccountId);
-    await requireOwnedAccount(Account, req.user.id, fromAccountId, { active: true });
-    await requireOwnedAccount(Account, req.user.id, toAccountId, { active: true });
-    if (req.body.fromAccountId !== undefined) transfer.fromAccountId = req.body.fromAccountId;
-    if (req.body.toAccountId !== undefined) transfer.toAccountId = req.body.toAccountId;
+    const parties = resolveParties({
+      fromAccountId: req.body.fromAccountId !== undefined ? req.body.fromAccountId : transfer.fromAccountId,
+      senderName: req.body.senderName !== undefined ? req.body.senderName : transfer.senderName,
+      toAccountId: req.body.toAccountId !== undefined ? req.body.toAccountId : transfer.toAccountId,
+      recipientName: req.body.recipientName !== undefined ? req.body.recipientName : transfer.recipientName,
+    });
+    if (parties.from.accountId) {
+      await requireOwnedAccount(Account, req.user.id, parties.from.accountId, { active: true });
+    }
+    if (parties.to.accountId) {
+      await requireOwnedAccount(Account, req.user.id, parties.to.accountId, { active: true });
+    }
+    transfer.set('fromAccountId', parties.from.accountId || undefined);
+    transfer.senderName = parties.from.name;
+    transfer.set('toAccountId', parties.to.accountId || undefined);
+    transfer.recipientName = parties.to.name;
     if (req.body.amount !== undefined) transfer.amount = Number(req.body.amount);
     if (req.body.description !== undefined) transfer.description = req.body.description;
     if (req.body.transactionDate !== undefined) {

@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-tint: var(--primary-tint);
+  --color-primary-shade: var(--primary-shade);
+  --color-neutral-0: var(--neutral-0);
+  --color-neutral-50: var(--neutral-50);
+  --color-neutral-200: var(--neutral-200);
+  --color-neutral-500: var(--neutral-500);
+  --color-neutral-900: var(--neutral-900);
+  --font-sans: 'Segoe UI', sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--neutral-50);
+  color: var(--neutral-900);
+  font-family: var(--font-sans);
+}

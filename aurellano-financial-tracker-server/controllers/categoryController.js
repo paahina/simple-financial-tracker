@@ -53,6 +53,18 @@ const getAllCategories = async (req, res) => {
   }
 };
 
+const getCategoryById = async (req, res) => {
+  try {
+    const category = await Category.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!category) {
+      return res.status(HttpStatus.NOT_FOUND).json({ message: 'Category not found' });
+    }
+    res.status(HttpStatus.OK).json(category);
+  } catch (error) {
+    sendFinanceError(res, error);
+  }
+};
+
 const createCategory = async (req, res) => {
   try {
     await ensureDefaultCategories(req.user.id);
@@ -111,6 +123,7 @@ module.exports = {
   ensureDefaultCategories,
   requireCategory,
   getAllCategories,
+  getCategoryById,
   createCategory,
   updateCategory,
   deactivateCategory,
