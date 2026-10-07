@@ -9,7 +9,7 @@ export default defineConfig([
     extends: [js.configs.recommended],
     languageOptions: {
       ecmaVersion: 'latest',
-      sourceType: 'module',
+      sourceType: 'commonjs',
       globals: globals.node,
     },
   },

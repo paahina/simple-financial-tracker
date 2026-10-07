@@ -41,12 +41,14 @@ Client:
 npm run dev --prefix aurellano-financial-tracker
 ```
 
-API (connects to MongoDB, then listens on port 5000):
+API (connects to MongoDB, then listens on port 5001):
 
 ```bash
 npm run dev --prefix aurellano-financial-tracker-server
 ```
 
-Health check: `GET http://localhost:5000/api/health`
+Health check: `GET http://localhost:5001/`
+
+User routes use a Bearer token. Set `JWT_SECRET` in the server `.env` before starting the API. Register and login return `token`. Send it as `Authorization: Bearer <token>` on `POST /api/users/logout`, `GET /api/users/session`, `GET /api/users/getAllUsers`, `GET /api/users/get/:id`, `PUT /api/users/update/:id`, and `DELETE /api/users/delete/:id`.
 
 A local `.env` is created for development. It is gitignored. The default database is `mongodb://127.0.0.1:27017/simple-financial-tracker`.

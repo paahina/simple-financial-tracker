@@ -11,49 +11,82 @@ Authentication:
 - Exact authentication implementation is defined in the tech stack.
 
 --------------------------------------------------
-AUTH
+USER
 --------------------------------------------------
 
-POST /api/auth/register
+POST /api/users/register
 Create a user.
 
-POST /api/auth/login
-Authenticate a user.
+POST /api/users/login
+Authenticate a user. Returns a Bearer token.
 
-POST /api/auth/logout
-End authenticated session.
+POST /api/users/logout
+End authenticated session. Requires Authorization: Bearer token.
 
-GET /api/auth/me
+GET /api/users/session
 Return current authenticated user.
+
+GET /api/users/getAllUsers
+List users. Requires SYSTEM_ADMIN.
+
+GET /api/users/get/:id
+Get one user. Owner or SYSTEM_ADMIN.
+
+PUT /api/users/update/:id
+Update one user. Owner or SYSTEM_ADMIN.
+
+DELETE /api/users/delete/:id
+Delete one user. Requires SYSTEM_ADMIN.
+
+Amounts are integer centavos. PHP 100.50 is 10050.
+All routes below require Authorization: Bearer token.
+A user can only access their own financial records.
 
 --------------------------------------------------
 ACCOUNTS
 --------------------------------------------------
 
-GET /api/accounts
-List current user's accounts.
+GET /api/accounts/getAllAccounts
+List current user's accounts, each with a derived balance.
 
-POST /api/accounts
-Create an account.
+POST /api/accounts/create
+Create an account. Fields: name, type (CASH, E_WALLET, BANK), initialBalance, currency, description.
 
-GET /api/accounts/:accountId
-Get one account.
+GET /api/accounts/get/:id
+Get one account and its balance.
 
-PATCH /api/accounts/:accountId
-Update account.
+PUT /api/accounts/update/:id
+Update name, type, currency, or description. Initial balance cannot change.
 
-DELETE /api/accounts/:accountId
-Deactivate/delete according to business rules.
+DELETE /api/accounts/delete/:id
+Deactivate the account.
 
-GET /api/accounts/:accountId/transactions
-Get account activity.
+GET /api/accounts/get/:id/activity
+Transactions, transfers, and debt payments for the account.
+
+--------------------------------------------------
+CATEGORIES
+--------------------------------------------------
+
+GET /api/categories/getAllCategories
+List categories. Default income and expense categories are created on first use.
+Optional query: type=INCOME or type=EXPENSE.
+
+POST /api/categories/create
+Create a category. Fields: name, type.
+
+PUT /api/categories/update/:id
+Update name or isActive.
+
+DELETE /api/categories/delete/:id
+Deactivate the category.
 
 --------------------------------------------------
 TRANSACTIONS
 --------------------------------------------------
 
-GET /api/transactions
-List transactions.
+GET /api/transactions/getAllTransactions
+List income and expenses.
 
 Supported filters:
 - type
@@ -65,97 +98,83 @@ Supported filters:
 - page
 - limit
 
-POST /api/transactions
+POST /api/transactions/create
 Create income or expense.
+Fields: accountId, type (INCOME or EXPENSE), amount, label, categoryId, description, transactionDate.
 
-GET /api/transactions/:transactionId
-Get transaction.
+GET /api/transactions/get/:id
+Get one transaction.
 
-PATCH /api/transactions/:transactionId
-Update transaction.
+PUT /api/transactions/update/:id
+Update a transaction.
 
-DELETE /api/transactions/:transactionId
-Delete/cancel transaction according to business rules.
+DELETE /api/transactions/delete/:id
+Delete a transaction.
 
 --------------------------------------------------
 TRANSFERS
 --------------------------------------------------
 
-GET /api/transfers
+GET /api/transfers/getAllTransfers
 List transfers.
 
-POST /api/transfers
-Create account-to-account transfer.
+POST /api/transfers/create
+Move money between two accounts owned by the user.
+Fields: fromAccountId, toAccountId, amount, description, transactionDate.
+A transfer is not income or expense.
 
-GET /api/transfers/:transferId
-Get transfer.
+GET /api/transfers/get/:id
+Get one transfer.
 
-PATCH /api/transfers/:transferId
-Update transfer.
+PUT /api/transfers/update/:id
+Update a transfer.
 
-DELETE /api/transfers/:transferId
-Delete/cancel transfer according to business rules.
-
---------------------------------------------------
-CATEGORIES
---------------------------------------------------
-
-GET /api/categories
-List categories.
-
-POST /api/categories
-Create category if user-managed categories are enabled.
-
-PATCH /api/categories/:categoryId
-Update category.
-
-DELETE /api/categories/:categoryId
-Deactivate category.
+DELETE /api/transfers/delete/:id
+Delete a transfer.
 
 --------------------------------------------------
 DEBTS
 --------------------------------------------------
 
-GET /api/debts
-List user's debts.
+GET /api/debts/getAllDebts
+List debts with derived remainingAmount and status.
 
-POST /api/debts
-Create debt.
+POST /api/debts/create
+Create a receivable. Fields: personName, description, originalAmount, dueDate.
 
-GET /api/debts/:debtId
-Get debt.
+GET /api/debts/get/:id
+Get one debt and its payments.
 
-PATCH /api/debts/:debtId
-Update debt.
+PUT /api/debts/update/:id
+Update a debt.
 
-DELETE /api/debts/:debtId
-Delete/deactivate debt according to business rules.
+DELETE /api/debts/delete/:id
+Delete a debt that has no payments.
 
-GET /api/debts/:debtId/payments
-List payments.
+GET /api/debts/getPayments/:id
+List payments for a debt.
 
-POST /api/debts/:debtId/payments
-Record a debt payment.
+POST /api/debts/createPayment
+Record a payment. Fields: debtId, accountId, amount, paymentDate, notes.
+The payment increases the selected account and cannot exceed the remaining debt.
 
-PATCH /api/debts/:debtId/payments/:paymentId
-Edit payment.
+PUT /api/debts/updatePayment/:id
+Edit a payment.
 
-DELETE /api/debts/:debtId/payments/:paymentId
-Delete/cancel payment according to business rules.
+DELETE /api/debts/deletePayment/:id
+Delete a payment.
 
 --------------------------------------------------
 DASHBOARD
 --------------------------------------------------
 
-GET /api/dashboard
-Return current dashboard summary.
-
-Potential response sections:
+GET /api/dashboard/get
+Return the current month summary:
 - totalMoney
 - monthlyIncome
 - monthlyExpenses
 - monthlyNet
-- outstandingDebt
+- outstandingReceivables
 - accountBalances
 - recentTransactions
 
@@ -171,6 +190,8 @@ Return:
 - net
 - incomeByCategory
 - expensesByCategory
+
+Transfers and debt payments are excluded from income and expenses.
 
 GET /api/reports/yearly?year=2026
 
