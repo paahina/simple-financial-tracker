@@ -1,0 +1,185 @@
+SIMPLE FINANCIAL TRACKER
+Storage Management & MongoDB TTL Strategy
+==========================================
+
+PURPOSE
+
+The application should take advantage of MongoDB TTL indexes to automatically clean up data that is intentionally temporary, while preserving the user's financial history.
+
+The goal is to control unnecessary storage growth without deleting useful financial records.
+
+--------------------------------------------------
+1. CORE DECISION
+--------------------------------------------------
+
+Use MongoDB TTL indexes for temporary/expiring data.
+
+Do NOT use TTL indexes to automatically delete financial history based on age.
+
+Financial records should remain available unless the user explicitly deletes, archives, or otherwise manages them according to an intentional product rule.
+
+--------------------------------------------------
+2. USE EXPIRESAT FOR TTL DATA
+--------------------------------------------------
+
+Temporary documents should use an explicit expiresAt field.
+
+Example:
+
+{
+  tokenHash: "...",
+  userId: "...",
+  expiresAt: ISODate("2026-10-08T12:00:00Z")
+}
+
+Recommended MongoDB TTL index:
+
+{ expiresAt: 1 }
+
+with:
+
+{ expireAfterSeconds: 0 }
+
+This makes expiration part of the data model instead of relying on a generic createdAt retention rule.
+
+--------------------------------------------------
+3. GOOD TTL CANDIDATES
+--------------------------------------------------
+
+Use TTL for data such as:
+
+- Password reset tokens
+- Email verification tokens
+- Temporary uploads
+- Temporary/cache records
+- Other explicitly time-limited application data
+
+Application logs may also use retention/TTL where the chosen logging solution supports it.
+
+--------------------------------------------------
+4. DO NOT TTL FINANCIAL RECORDS
+--------------------------------------------------
+
+Do NOT automatically expire:
+
+- Users
+- Accounts
+- Transactions
+- Transfers
+- Debts
+- Debt payments
+- Categories that are needed for historical reporting
+
+Do not implement rules such as:
+
+"Delete all records older than one year."
+
+based only on createdAt.
+
+This would reduce storage at the cost of destroying financial history.
+
+--------------------------------------------------
+5. CREATEDAT VS EXPIRESAT
+--------------------------------------------------
+
+createdAt answers:
+"When was this document created?"
+
+expiresAt answers:
+"When is this temporary document allowed to expire?"
+
+For TTL-managed records, prefer expiresAt because different temporary records can have different retention periods.
+
+Examples:
+
+Password reset token:
+- expiresAt = createdAt + 1 hour
+
+Email verification token:
+- expiresAt = createdAt + 24 hours
+
+Temporary upload:
+- expiresAt = createdAt + 1 day
+
+--------------------------------------------------
+6. TTL IS EVENTUAL CLEANUP
+--------------------------------------------------
+
+MongoDB TTL cleanup is not a precise real-time timer.
+
+An expired document should be considered expired for application purposes, while physical removal by MongoDB may happen later when the TTL monitor processes it.
+
+Application logic must not depend on the exact deletion timestamp.
+
+For security-sensitive tokens, the application should still check whether the token is expired rather than assuming MongoDB has already removed it.
+
+--------------------------------------------------
+7. STORAGE-SAVING STRATEGIES
+--------------------------------------------------
+
+In addition to TTL:
+
+- Use pagination for transaction/history APIs.
+- Avoid storing duplicated monthly/yearly report totals as primary data.
+- Calculate reports from source records.
+- Avoid storing unnecessary response/cache copies.
+- Keep temporary data temporary.
+- Monitor database storage usage.
+- Use explicit archival/export strategies if the application eventually becomes large.
+
+--------------------------------------------------
+8. STORAGE MONITORING
+--------------------------------------------------
+
+The application should eventually expose or monitor storage usage so the developer can see when the database approaches a service limit.
+
+Suggested warning levels:
+
+70% - informational
+85% - warning
+95% - critical
+
+The exact thresholds can be adjusted based on the hosting provider's limits.
+
+Monitoring is preferable to silently deleting user financial history.
+
+--------------------------------------------------
+9. FREE-TIER PRINCIPLE
+--------------------------------------------------
+
+For a personal financial tracker, financial records are expected to grow relatively slowly compared with high-volume applications.
+
+Therefore:
+
+1. Clean up temporary data automatically.
+2. Monitor storage usage.
+3. Keep financial history intact.
+4. Archive/export deliberately if the dataset ever becomes large.
+5. Upgrade storage if necessary rather than automatically destroying financial history.
+
+--------------------------------------------------
+10. IMPLEMENTATION GUIDANCE
+--------------------------------------------------
+
+When a temporary collection is introduced:
+
+1. Add expiresAt to its schema.
+2. Create a MongoDB TTL index on expiresAt.
+3. Set expiresAt explicitly when creating the document.
+4. Validate expiration in application logic where security requires it.
+5. Test that expired records are eventually removed.
+
+Do not add a generic TTL index to every collection.
+
+--------------------------------------------------
+11. MVP SCOPE
+--------------------------------------------------
+
+MVP should include:
+
+- TTL strategy documented.
+- TTL indexes for any temporary token/record collections that are actually implemented.
+- Pagination for potentially large financial-history endpoints.
+- No automatic age-based deletion of financial records.
+
+Full storage dashboards and advanced archival can be added later if real usage requires them.

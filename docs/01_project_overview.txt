@@ -1,0 +1,136 @@
+SIMPLE FINANCIAL TRACKER
+Project Planning Document
+=========================
+
+1. PROJECT PURPOSE
+
+A personal financial tracker web application for users to manually record and understand their finances.
+
+The application does NOT integrate with banks, e-wallets, or other financial APIs. Users manually create their financial accounts and manually record income, expenses, transfers, and debt payments.
+
+The primary goal is simplicity, correctness, and useful financial summaries.
+
+2. USER ROLES
+
+SYSTEM_ADMIN
+- Administrative role.
+- Can manage system-level data and users as defined by the implementation.
+- Does not automatically gain unrestricted access to private financial information unless explicitly required by the application's authorization rules.
+
+USER
+- Tracks their own finances.
+- Creates and manages their own accounts.
+- Records income and expenses.
+- Transfers money between their own accounts.
+- Tracks money owed to them.
+- Views dashboards and monthly/yearly reports.
+
+3. CORE DOMAIN CONCEPTS
+
+User
+Account
+Transaction
+Transfer
+Category
+Debt
+DebtPayment
+Reports/Summaries
+
+4. CORE PRINCIPLE
+
+Accounts represent where the user's money is held.
+
+Transactions represent money entering or leaving an account through income or expenses.
+
+Transfers represent movement of money between two accounts owned by the same user.
+
+Debts represent money other people owe the user.
+
+Reports are derived from the underlying financial records rather than manually stored totals.
+
+5. MVP SCOPE
+
+Authentication
+- Register
+- Login
+- Logout
+- Password hashing
+- User roles
+
+Accounts
+- Create account
+- Edit account
+- Deactivate/delete account according to business rules
+- Set initial balance
+- View account balance
+- Select account for financial operations
+
+Transactions
+- Create income
+- Create expense
+- Edit transaction
+- Delete transaction
+- Category
+- Label
+- Amount
+- Transaction date
+- Optional notes
+- Account selection
+
+Transfers
+- Account-to-account transfer
+- Source account
+- Destination account
+- Amount
+- Transfer date
+- Optional description
+
+Debts
+- Create debt
+- Person who owes the user
+- Original amount
+- Due date
+- Record payments
+- Remaining amount
+- Debt status
+
+Dashboard
+- Total money across active accounts
+- Current account balances
+- Monthly income
+- Monthly expenses
+- Monthly net
+- Total outstanding receivables
+- Recent transactions
+
+Reports
+- Monthly summary
+- Yearly summary
+- Income by category
+- Expenses by category
+- Monthly income/expense comparison
+
+6. NON-GOALS FOR MVP
+
+Do not implement initially:
+- Bank API integrations
+- E-wallet API integrations
+- Investment tracking
+- Cryptocurrency
+- Credit-card interest calculations
+- Automated financial advice
+- Complex budgeting
+- Recurring transaction automation
+- Multi-currency conversion
+- Shared household accounts
+
+These can be considered later if the core application proves useful.
+
+7. DESIGN PRINCIPLES
+
+- Keep the application personal and simple.
+- Financial totals should be derived from source records.
+- Validate all financial input.
+- Keep income/expense transactions separate from account-to-account transfers.
+- A user can only access their own financial records.
+- Prefer explicit business rules over hidden behavior.

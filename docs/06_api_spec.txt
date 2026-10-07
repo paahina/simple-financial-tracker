@@ -1,0 +1,228 @@
+SIMPLE FINANCIAL TRACKER
+REST API Specification - MVP
+============================
+
+BASE URL
+
+/api
+
+Authentication:
+- Protected endpoints require an authenticated user.
+- Exact authentication implementation is defined in the tech stack.
+
+--------------------------------------------------
+AUTH
+--------------------------------------------------
+
+POST /api/auth/register
+Create a user.
+
+POST /api/auth/login
+Authenticate a user.
+
+POST /api/auth/logout
+End authenticated session.
+
+GET /api/auth/me
+Return current authenticated user.
+
+--------------------------------------------------
+ACCOUNTS
+--------------------------------------------------
+
+GET /api/accounts
+List current user's accounts.
+
+POST /api/accounts
+Create an account.
+
+GET /api/accounts/:accountId
+Get one account.
+
+PATCH /api/accounts/:accountId
+Update account.
+
+DELETE /api/accounts/:accountId
+Deactivate/delete according to business rules.
+
+GET /api/accounts/:accountId/transactions
+Get account activity.
+
+--------------------------------------------------
+TRANSACTIONS
+--------------------------------------------------
+
+GET /api/transactions
+List transactions.
+
+Supported filters:
+- type
+- accountId
+- categoryId
+- startDate
+- endDate
+- search
+- page
+- limit
+
+POST /api/transactions
+Create income or expense.
+
+GET /api/transactions/:transactionId
+Get transaction.
+
+PATCH /api/transactions/:transactionId
+Update transaction.
+
+DELETE /api/transactions/:transactionId
+Delete/cancel transaction according to business rules.
+
+--------------------------------------------------
+TRANSFERS
+--------------------------------------------------
+
+GET /api/transfers
+List transfers.
+
+POST /api/transfers
+Create account-to-account transfer.
+
+GET /api/transfers/:transferId
+Get transfer.
+
+PATCH /api/transfers/:transferId
+Update transfer.
+
+DELETE /api/transfers/:transferId
+Delete/cancel transfer according to business rules.
+
+--------------------------------------------------
+CATEGORIES
+--------------------------------------------------
+
+GET /api/categories
+List categories.
+
+POST /api/categories
+Create category if user-managed categories are enabled.
+
+PATCH /api/categories/:categoryId
+Update category.
+
+DELETE /api/categories/:categoryId
+Deactivate category.
+
+--------------------------------------------------
+DEBTS
+--------------------------------------------------
+
+GET /api/debts
+List user's debts.
+
+POST /api/debts
+Create debt.
+
+GET /api/debts/:debtId
+Get debt.
+
+PATCH /api/debts/:debtId
+Update debt.
+
+DELETE /api/debts/:debtId
+Delete/deactivate debt according to business rules.
+
+GET /api/debts/:debtId/payments
+List payments.
+
+POST /api/debts/:debtId/payments
+Record a debt payment.
+
+PATCH /api/debts/:debtId/payments/:paymentId
+Edit payment.
+
+DELETE /api/debts/:debtId/payments/:paymentId
+Delete/cancel payment according to business rules.
+
+--------------------------------------------------
+DASHBOARD
+--------------------------------------------------
+
+GET /api/dashboard
+Return current dashboard summary.
+
+Potential response sections:
+- totalMoney
+- monthlyIncome
+- monthlyExpenses
+- monthlyNet
+- outstandingDebt
+- accountBalances
+- recentTransactions
+
+--------------------------------------------------
+REPORTS
+--------------------------------------------------
+
+GET /api/reports/monthly?year=2026&month=10
+
+Return:
+- income
+- expenses
+- net
+- incomeByCategory
+- expensesByCategory
+
+GET /api/reports/yearly?year=2026
+
+Return:
+- income
+- expenses
+- net
+- monthlyBreakdown
+
+--------------------------------------------------
+API RESPONSE CONVENTION
+--------------------------------------------------
+
+Success example:
+
+{
+  "success": true,
+  "data": {}
+}
+
+Error example:
+
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Amount must be greater than zero"
+  }
+}
+
+Pagination example:
+
+{
+  "success": true,
+  "data": [],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 100,
+    "totalPages": 5
+  }
+}
+
+HTTP STATUS GUIDELINES
+
+200 OK
+201 Created
+204 No Content
+400 Bad Request
+401 Unauthorized
+403 Forbidden
+404 Not Found
+409 Conflict
+422 Unprocessable Entity when appropriate
+500 Internal Server Error

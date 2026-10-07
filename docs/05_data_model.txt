@@ -1,0 +1,289 @@
+SIMPLE FINANCIAL TRACKER
+MongoDB Data Model
+==================
+
+The MVP uses separate MongoDB collections for the main domain objects.
+
+COLLECTIONS
+
+users
+accounts
+categories
+transactions
+transfers
+debts
+debtPayments
+
+Temporary/expiring collections may be added as needed (for example password reset tokens). These should use an explicit expiresAt field and MongoDB TTL indexes rather than age-based deletion of financial records.
+
+--------------------------------------------------
+1. USER
+--------------------------------------------------
+
+User
+- _id
+- name
+- email
+- passwordHash
+- role
+- createdAt
+- updatedAt
+
+role:
+- USER
+- SYSTEM_ADMIN
+
+Rules:
+- email must be unique.
+- passwordHash is never returned to normal API responses.
+
+--------------------------------------------------
+2. ACCOUNT
+--------------------------------------------------
+
+Account
+- _id
+- userId
+- name
+- type
+- initialBalance
+- currency
+- description
+- isActive
+- createdAt
+- updatedAt
+
+type:
+- CASH
+- E_WALLET
+- BANK
+
+Example:
+{
+  name: "GCash",
+  type: "E_WALLET",
+  initialBalance: 500000,
+  currency: "PHP",
+  isActive: true
+}
+
+MONEY STORAGE:
+Prefer storing monetary amounts as integer minor units.
+
+Example:
+PHP 100.50 -> 10050 centavos.
+
+This avoids common floating-point precision problems.
+
+--------------------------------------------------
+3. CATEGORY
+--------------------------------------------------
+
+Category
+- _id
+- userId or system/default ownership strategy
+- name
+- type
+- isActive
+- createdAt
+- updatedAt
+
+type:
+- INCOME
+- EXPENSE
+
+A category should not normally be used for a transfer.
+
+--------------------------------------------------
+4. TRANSACTION
+--------------------------------------------------
+
+Transaction
+- _id
+- userId
+- accountId
+- type
+- amount
+- label
+- categoryId
+- description
+- transactionDate
+- createdAt
+- updatedAt
+
+type:
+- INCOME
+- EXPENSE
+
+Rules:
+- amount must be positive.
+- type determines whether it increases or decreases the account balance.
+- accountId must belong to the authenticated user.
+- category type should match transaction type.
+
+Example:
+{
+  accountId: "...",
+  type: "EXPENSE",
+  amount: 25000,
+  label: "Lunch",
+  categoryId: "...",
+  transactionDate: "2026-10-07"
+}
+
+--------------------------------------------------
+5. TRANSFER
+--------------------------------------------------
+
+Transfer
+- _id
+- userId
+- fromAccountId
+- toAccountId
+- amount
+- description
+- transactionDate
+- createdAt
+- updatedAt
+
+Rules:
+- fromAccountId != toAccountId.
+- both accounts must belong to the authenticated user.
+- amount must be positive.
+- transfer does not count toward income/expense reports.
+
+--------------------------------------------------
+6. DEBT
+--------------------------------------------------
+
+Debt
+- _id
+- userId
+- personName
+- description
+- originalAmount
+- dueDate
+- status
+- createdAt
+- updatedAt
+
+status:
+- PENDING
+- PARTIALLY_PAID
+- PAID
+- OVERDUE
+
+Do not rely on a manually edited remainingAmount as the authoritative value.
+
+remainingAmount should be derived:
+
+remainingAmount =
+originalAmount - sum(debtPayments.amount)
+
+A cached remainingAmount may be considered later.
+
+--------------------------------------------------
+7. DEBT PAYMENT
+--------------------------------------------------
+
+DebtPayment
+- _id
+- userId
+- debtId
+- accountId
+- amount
+- paymentDate
+- notes
+- createdAt
+- updatedAt
+
+Important:
+A debt payment represents money received into one of the user's accounts.
+
+Therefore recording a debt payment should affect the selected account balance.
+
+Business classification:
+- It is a debt settlement event.
+- It should not automatically be treated as normal salary/business income unless the reporting rules explicitly decide so.
+
+For MVP, keep debt repayment reporting separate from ordinary income unless a later business decision changes this.
+
+--------------------------------------------------
+8. RELATIONSHIPS
+--------------------------------------------------
+
+User
+  ├── Accounts
+  ├── Transactions
+  ├── Transfers
+  ├── Categories
+  ├── Debts
+  └── DebtPayments
+
+Account
+  ├── Transactions
+  ├── Transfers as source
+  ├── Transfers as destination
+  └── DebtPayments received
+
+Debt
+  └── DebtPayments
+
+Category
+  └── Transactions
+
+--------------------------------------------------
+9. IMPORTANT INDEXES
+--------------------------------------------------
+
+Recommended indexes:
+- users.email unique
+- accounts.userId
+- transactions.userId + transactionDate
+- transactions.accountId + transactionDate
+- transactions.categoryId
+- transfers.userId + transactionDate
+- debts.userId + status
+- debtPayments.debtId + paymentDate
+- debtPayments.accountId + paymentDate
+
+Exact compound indexes should be verified against real query patterns.
+
+--------------------------------------------------
+10. TTL / TEMPORARY DATA
+--------------------------------------------------
+
+Temporary records should use an explicit expiresAt field when they are intentionally time-limited.
+
+Recommended MongoDB TTL index pattern:
+- index: expiresAt: 1
+- expireAfterSeconds: 0
+
+Typical candidates:
+- password reset tokens
+- email verification tokens
+- temporary uploads
+- temporary/cache records
+
+TTL should not be applied to financial records such as transactions, transfers, debts, or debt payments merely because they are old.
+
+--------------------------------------------------
+11. DELETION RULES
+--------------------------------------------------
+
+Financial records should not be casually hard-deleted when doing so would destroy useful history.
+
+Preferred approach:
+- Deactivate accounts.
+- Consider soft deletion or audit behavior for important financial records.
+- If hard deletion is allowed in MVP, explicitly define its cascading/validation behavior.
+
+--------------------------------------------------
+11. DATA OWNERSHIP
+--------------------------------------------------
+
+Every user-owned document must be scoped to the authenticated user.
+
+Never trust a client-provided userId to determine ownership.
+
+The backend should derive the current user from the authenticated session/token and use that identity for queries and writes.

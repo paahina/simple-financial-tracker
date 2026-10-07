@@ -1,0 +1,406 @@
+SIMPLE FINANCIAL TRACKER
+Backend Development Plan
+========================
+
+1. BACKEND ARCHITECTURE
+
+The backend should use an MVC-style REST architecture with a Service Layer.
+
+Recommended pattern:
+Routes -> Middleware -> Controllers -> Services -> Models -> MongoDB
+                         |
+                    Validators
+
+This is preferable to putting all business logic directly inside controllers.
+
+Note on terminology:
+- The project may be described as MVC.
+- For this application, the practical implementation is MVC + Services + Validators + Middleware.
+- Express routes act as the routing layer.
+- Controllers handle HTTP concerns.
+- Services contain financial/domain logic.
+- Mongoose models handle persistence/schema definitions.
+
+--------------------------------------------------
+2. RECOMMENDED BACKEND FOLDER STRUCTURE
+--------------------------------------------------
+
+server/
+├── config/
+│   ├── db.js
+│   ├── env.js
+│   └── security.js
+├── models/
+│   ├── User.js
+│   ├── Account.js
+│   ├── Category.js
+│   ├── Transaction.js
+│   ├── Transfer.js
+│   ├── Debt.js
+│   └── DebtPayment.js
+├── controllers/
+│   ├── authController.js
+│   ├── accountController.js
+│   ├── categoryController.js
+│   ├── transactionController.js
+│   ├── transferController.js
+│   ├── debtController.js
+│   ├── dashboardController.js
+│   ├── reportController.js
+│   └── adminController.js
+├── services/
+│   ├── authService.js
+│   ├── accountService.js
+│   ├── categoryService.js
+│   ├── transactionService.js
+│   ├── transferService.js
+│   ├── debtService.js
+│   ├── dashboardService.js
+│   ├── reportService.js
+│   └── adminService.js
+├── routes/
+│   ├── authRoutes.js
+│   ├── accountRoutes.js
+│   ├── categoryRoutes.js
+│   ├── transactionRoutes.js
+│   ├── transferRoutes.js
+│   ├── debtRoutes.js
+│   ├── dashboardRoutes.js
+│   ├── reportRoutes.js
+│   └── adminRoutes.js
+├── middleware/
+│   ├── auth.js
+│   ├── authorize.js
+│   ├── validate.js
+│   ├── errorHandler.js
+│   ├── rateLimiter.js
+│   └── notFound.js
+├── validators/
+│   ├── authValidators.js
+│   ├── accountValidators.js
+│   ├── categoryValidators.js
+│   ├── transactionValidators.js
+│   ├── transferValidators.js
+│   ├── debtValidators.js
+│   └── reportValidators.js
+├── utils/
+│   ├── AppError.js
+│   ├── asyncHandler.js
+│   ├── pagination.js
+│   ├── money.js
+│   └── dates.js
+├── app.js
+└── server.js
+
+If a module grows substantially, related helpers can be placed inside a module-specific
+folder without changing the overall architecture.
+
+--------------------------------------------------
+3. LAYER RESPONSIBILITIES
+--------------------------------------------------
+
+ROUTES
+- Define endpoint paths and HTTP methods.
+- Attach authentication and authorization middleware.
+- Attach request validation.
+- Delegate to controllers.
+
+CONTROLLERS
+- Read req.params, req.query, req.body, and authenticated user information.
+- Call one or more services.
+- Convert service results into HTTP responses.
+- Do not contain complex financial rules.
+
+SERVICES
+- Main business/domain layer.
+- Enforce ownership and financial rules.
+- Perform calculations and coordinate multiple models.
+- Handle transactions where multiple writes must succeed together.
+- Produce data needed by controllers.
+
+MODELS
+- Mongoose schemas.
+- Field types and validation appropriate to persistence.
+- Index definitions.
+- Relationships through ObjectId references.
+- TTL indexes for intentionally temporary collections where applicable.
+
+VALIDATORS
+- Validate request input before controller/service processing.
+- Validate amount, dates, enums, IDs, filters, pagination, etc.
+
+MIDDLEWARE
+- Authentication.
+- Role authorization.
+- Validation execution.
+- Rate limiting.
+- Error handling.
+- Request-level security controls.
+
+UTILS
+- Small, reusable, deterministic helpers.
+- Do not turn utils into an unstructured second service layer.
+
+--------------------------------------------------
+4. CONTROLLER EXAMPLE FLOW
+--------------------------------------------------
+
+POST /api/transactions
+        |
+        v
+transactionRoutes.js
+        |
+        v
+auth middleware
+        |
+        v
+validation middleware
+        |
+        v
+transactionController.createTransaction()
+        |
+        v
+transactionService.createTransaction()
+        |
+        +--> verify account ownership
+        +--> verify category/type compatibility
+        +--> validate amount/date/business rules
+        +--> create transaction
+        |
+        v
+controller sends standardized response
+
+--------------------------------------------------
+5. FINANCIAL BUSINESS LOGIC LOCATION
+--------------------------------------------------
+
+Financial rules belong in services and tested calculation helpers.
+
+Examples:
+- Account current balance.
+- Monthly income/expense totals.
+- Transfer effects.
+- Debt remaining amount.
+- Debt status.
+- Report aggregation.
+
+Do not implement these rules independently in every controller or frontend page.
+
+--------------------------------------------------
+6. AUTHENTICATION AND AUTHORIZATION
+--------------------------------------------------
+
+Authentication:
+- Register.
+- Login.
+- Logout.
+- Current user.
+- Password hashing.
+- Prefer secure HTTP-only authentication cookies.
+
+Authorization:
+- Every protected financial request uses the authenticated user identity.
+- Never trust userId supplied by the client as the ownership source.
+- Resources are queried using authenticated user ownership.
+- SYSTEM_ADMIN and USER roles are explicit.
+
+Admin routes should use both:
+- authentication middleware
+- role authorization middleware
+
+--------------------------------------------------
+7. RESOURCE OWNERSHIP PATTERN
+--------------------------------------------------
+
+For user-owned resources:
+
+1. Authenticate request.
+2. Obtain req.user.id from trusted authentication state.
+3. Query the requested resource together with ownership condition.
+4. Reject if it does not belong to the current user.
+5. Perform the service operation.
+
+Avoid:
+- Fetching by arbitrary ID and assuming it belongs to the user.
+- Trusting client-provided userId.
+
+--------------------------------------------------
+8. TRANSACTION SERVICE RULES
+--------------------------------------------------
+
+Transaction creation must verify:
+- authenticated user owns the account
+- category is valid for INCOME/EXPENSE type
+- amount > 0
+- valid financial date
+
+Transaction edits/deletions must preserve ownership and financial integrity.
+
+Financial history should preferably use cancellation/deactivation patterns where
+appropriate instead of destructive hard deletion.
+
+--------------------------------------------------
+9. TRANSFER SERVICE RULES
+--------------------------------------------------
+
+Transfer creation must verify:
+- source account belongs to user
+- destination account belongs to user
+- source != destination
+- amount > 0
+
+Transfer is not an income or expense.
+
+If transfer operations eventually update cached balances, the operation should use
+a MongoDB transaction where appropriate so both sides remain consistent.
+
+--------------------------------------------------
+10. DEBT SERVICE RULES
+--------------------------------------------------
+
+Debt:
+- stores original amount and identifying information
+- remaining amount is derived from payments
+
+Debt payment:
+- belongs to authenticated user
+- belongs to the debt
+- uses a receiving account owned by the user
+- amount > 0
+- should not exceed remaining amount unless explicit overpayment support is added
+
+Debt status is derived/maintained consistently from payment state and due date.
+
+--------------------------------------------------
+11. DASHBOARD AND REPORT SERVICES
+--------------------------------------------------
+
+Dashboard service:
+- Aggregate current account money.
+- Calculate current-period income/expense/net.
+- Calculate receivables.
+- Return account summaries and recent activity.
+
+Report service:
+- Monthly aggregation.
+- Yearly aggregation.
+- Category breakdowns.
+- Month-by-month comparison.
+
+Reports are derived from source records.
+Do not store duplicate report totals as authoritative financial data.
+
+--------------------------------------------------
+12. API RESPONSE CONTRACT
+--------------------------------------------------
+
+Success:
+{
+  success: true,
+  data: {}
+}
+
+Error:
+{
+  success: false,
+  error: {
+    code: "ERROR_CODE",
+    message: "Human-readable message"
+  }
+}
+
+Paginated responses should include consistent pagination metadata.
+
+--------------------------------------------------
+13. ERROR HANDLING
+--------------------------------------------------
+
+Use a centralized error-handling middleware.
+
+Services may throw known application errors.
+Controllers should not duplicate error formatting.
+
+Do not expose:
+- stack traces in production
+- MongoDB internals
+- passwords
+- token secrets
+- sensitive implementation details
+
+--------------------------------------------------
+14. ADMIN BACKEND
+--------------------------------------------------
+
+Admin endpoints should be isolated under /api/admin where practical.
+
+Initial MVP admin operations:
+- Get basic user list.
+- View user account metadata required for administration.
+- Perform only explicitly approved administrative actions.
+
+Do not automatically grant admins access to personal financial records.
+
+--------------------------------------------------
+15. STORAGE MANAGEMENT
+--------------------------------------------------
+
+Temporary collections may use:
+- expiresAt field
+- MongoDB TTL index with expireAfterSeconds: 0
+
+Examples:
+- password reset tokens
+- email verification tokens
+- temporary uploads
+- temporary/cache records
+
+Do not create TTL indexes on:
+- transactions
+- transfers
+- debts
+- debt payments
+- normal accounts
+
+See 12_storage_management.txt for retention details.
+
+--------------------------------------------------
+16. TESTING STRATEGY
+--------------------------------------------------
+
+Unit tests:
+- money calculations
+- balance calculations
+- debt remaining/status logic
+- report calculations
+
+API/integration tests:
+- authentication
+- authorization
+- ownership checks
+- transaction endpoints
+- transfer endpoints
+- debt endpoints
+- report endpoints
+
+End-to-end tests:
+- login -> dashboard
+- create account -> create income/expense -> verify dashboard
+- transfer between accounts
+- create debt -> record payment -> verify remaining
+
+Security tests should include cross-user access attempts.
+
+--------------------------------------------------
+17. BACKEND SCALABILITY RULE
+--------------------------------------------------
+
+Do not start with microservices.
+
+Keep the backend as a modular monolith:
+- one Express application
+- clear domain/service boundaries
+- MongoDB
+- stateless HTTP API where practical
+
+If the application grows, modules can be extracted later without first having to
+untangle business logic from route handlers.

@@ -1,0 +1,243 @@
+SIMPLE FINANCIAL TRACKER
+Development Roadmap
+====================
+
+PHASE 0 - PROJECT SETUP
+
+Tasks:
+- Create repository.
+- Create client React/Vite application.
+- Create server Express application.
+- Configure environment variables.
+- Configure MongoDB connection.
+- Configure ESLint/Prettier.
+- Establish folder structure.
+- Add README and documentation folder.
+
+Deliverable:
+A React client and Express API can run locally and connect to MongoDB.
+
+--------------------------------------------------
+PHASE 1 - AUTHENTICATION
+--------------------------------------------------
+
+Implement:
+- User model
+- Register
+- Login
+- Logout
+- Current-user endpoint
+- Password hashing
+- Authentication middleware
+- Role middleware
+
+Deliverable:
+User can securely register/login and protected endpoints reject unauthenticated requests.
+
+--------------------------------------------------
+PHASE 2 - ACCOUNTS
+--------------------------------------------------
+
+Implement:
+- Account model
+- Create account
+- List accounts
+- Get account
+- Update account
+- Deactivate account
+- Initial balance
+- Account ownership validation
+
+Deliverable:
+User can manually create GCash, bank, cash, etc.
+
+--------------------------------------------------
+PHASE 3 - CATEGORIES
+--------------------------------------------------
+
+Implement:
+- Default categories
+- Category model
+- Category listing
+- Category validation
+
+Deliverable:
+Income and expense can be categorized.
+
+--------------------------------------------------
+PHASE 4 - TRANSACTIONS
+--------------------------------------------------
+
+Implement:
+- Transaction model
+- Create income
+- Create expense
+- Edit
+- Delete/cancel
+- Transaction listing
+- Filtering
+- Account balance calculations
+
+Deliverable:
+User can accurately record financial activity.
+
+--------------------------------------------------
+PHASE 5 - TRANSFERS
+--------------------------------------------------
+
+Implement:
+- Transfer model
+- Create transfer
+- Edit
+- Delete/cancel
+- Source/destination validation
+- Balance impact
+
+Deliverable:
+User can move money between their own accounts without incorrectly creating income/expense.
+
+--------------------------------------------------
+PHASE 6 - DEBTS
+--------------------------------------------------
+
+Implement:
+- Debt model
+- Debt creation
+- Debt listing
+- Debt status
+- DebtPayment model
+- Record payment
+- Remaining amount
+- Receiving account impact
+
+Deliverable:
+User can track money owed to them and payments received.
+
+--------------------------------------------------
+PHASE 7 - DASHBOARD
+--------------------------------------------------
+
+Implement:
+- Total account money
+- Monthly income
+- Monthly expenses
+- Monthly net
+- Outstanding receivables
+- Account cards
+- Recent activity
+
+Deliverable:
+User gets a useful financial overview immediately after login.
+
+--------------------------------------------------
+PHASE 8 - REPORTS
+--------------------------------------------------
+
+Implement:
+- Monthly report
+- Yearly report
+- Income by category
+- Expenses by category
+- Monthly comparison
+
+Deliverable:
+User can understand financial trends.
+
+--------------------------------------------------
+PHASE 9 - STORAGE MANAGEMENT
+--------------------------------------------------
+
+Implement where applicable:
+- MongoDB TTL indexes for temporary records using expiresAt.
+- Expiration validation for security-sensitive temporary records.
+- Pagination for transaction/history endpoints.
+- No automatic age-based deletion of financial records.
+
+Deliverable:
+Temporary data can expire automatically without sacrificing financial history.
+
+--------------------------------------------------
+PHASE 10 - TESTING & HARDENING
+--------------------------------------------------
+
+Test:
+- Authentication
+- Authorization
+- Balance calculations
+- Transfers
+- Debt payments
+- Report calculations
+- Invalid inputs
+- Cross-user access attempts
+
+Add:
+- Unit tests
+- API tests
+- Important end-to-end tests
+
+Deliverable:
+MVP is stable and safe enough for personal use.
+
+--------------------------------------------------
+PHASE 11 - DEPLOYMENT
+--------------------------------------------------
+
+Tasks:
+- Production environment variables
+- Production MongoDB
+- Backend deployment
+- Frontend deployment
+- CORS configuration
+- Cookie/security configuration
+- Error logging
+- Database backup strategy
+
+Deliverable:
+Application is accessible in production.
+
+--------------------------------------------------
+POST-MVP / V2
+--------------------------------------------------
+
+Only after MVP is stable:
+
+1. Recurring transactions
+2. Budgeting
+3. Custom categories
+4. CSV export/import
+5. Notifications
+6. More advanced analytics
+7. Multi-currency
+8. Optional bank/e-wallet integrations
+
+--------------------------------------------------
+PHASE 0A - FRONTEND & BACKEND STRUCTURE
+--------------------------------------------------
+
+Before implementing feature screens/endpoints:
+
+Frontend:
+- Establish layouts, pages, components, feature modules, services, hooks, routes.
+- Establish UserLayout with top navbar navigation.
+- Establish AdminLayout with persistent sidebar navigation and top admin header.
+- Establish ProtectedRoute and RoleRoute.
+- Establish API client and TanStack Query conventions.
+- Establish reusable form, table, dialog, loading, empty, and error components.
+
+Backend:
+- Establish MVC + Service Layer structure.
+- Establish models, controllers, routes, services, validators, middleware, and utilities.
+- Establish centralized error handling.
+- Establish authentication and role middleware.
+- Establish consistent API response conventions.
+
+Deliverable:
+The codebase has a scalable structure before financial features are implemented.
+
+--------------------------------------------------
+IMPLEMENTATION REFERENCE
+--------------------------------------------------
+
+Use:
+- 13_frontend_development_plan.txt for frontend implementation structure and UI/UX.
+- 14_backend_development_plan.txt for backend MVC + Service Layer implementation.

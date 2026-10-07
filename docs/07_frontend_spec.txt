@@ -1,0 +1,191 @@
+SIMPLE FINANCIAL TRACKER
+Frontend Pages & User Flows
+===========================
+
+1. PUBLIC PAGES
+
+/login
+/register
+
+2. AUTHENTICATED APPLICATION
+
+/dashboard
+/accounts
+/accounts/:accountId
+/transactions
+/transfers
+/debts
+/debts/:debtId
+/reports
+
+3. ADMIN AREA
+
+/admin
+/admin/users
+
+UI shell decisions:
+- User application: top navbar navigation.
+- Admin application: persistent left sidebar navigation with a top header.
+- The two shells remain visually and structurally distinct.
+
+Only implement admin pages needed by actual system requirements.
+
+--------------------------------------------------
+DASHBOARD
+--------------------------------------------------
+
+Main sections:
+- Total Money
+- Income This Month
+- Expenses This Month
+- Net This Month
+- Money Others Owe
+- Account cards
+- Recent transactions
+- Monthly chart
+- Expense category chart
+
+Default reporting period:
+- Current month
+
+Allow the user to change the reporting period where practical.
+
+--------------------------------------------------
+ACCOUNTS PAGE
+--------------------------------------------------
+
+Show:
+- Account name
+- Account type
+- Current balance
+- Status
+
+Actions:
+- Add account
+- Edit account
+- Deactivate account
+- Open account details
+
+Account details:
+- Balance
+- Account information
+- Recent activity
+- Transactions affecting account
+- Transfers affecting account
+
+--------------------------------------------------
+TRANSACTION PAGE
+--------------------------------------------------
+
+Transaction list:
+- Date
+- Label
+- Type
+- Category
+- Account
+- Amount
+
+Actions:
+- Add
+- Edit
+- Delete/cancel
+
+Transaction form:
+- Type
+- Amount
+- Label
+- Category
+- Account
+- Date
+- Notes
+
+Validation:
+- amount > 0
+- required fields present
+- account belongs to current user
+- category matches transaction type
+
+--------------------------------------------------
+TRANSFER PAGE
+--------------------------------------------------
+
+Transfer form:
+- From account
+- To account
+- Amount
+- Date
+- Description
+
+Validation:
+- source != destination
+- both accounts available to current user
+- amount > 0
+
+Show transfer history.
+
+--------------------------------------------------
+DEBT PAGE
+--------------------------------------------------
+
+Debt list:
+- Person
+- Original amount
+- Remaining amount
+- Due date
+- Status
+
+Debt detail:
+- Debt information
+- Payment history
+- Remaining amount
+- Add payment
+
+Payment form:
+- Amount
+- Receiving account
+- Date
+- Notes
+
+--------------------------------------------------
+REPORTS PAGE
+--------------------------------------------------
+
+Tabs or selector:
+- Monthly
+- Yearly
+
+Monthly:
+- income
+- expenses
+- net
+- category breakdown
+
+Yearly:
+- income
+- expenses
+- net
+- month-by-month comparison
+
+Charts should support, not replace, readable numerical summaries.
+
+--------------------------------------------------
+UI PRINCIPLES
+--------------------------------------------------
+
+- Keep navigation simple.
+- Financial values should be visually easy to scan.
+- Avoid excessive animations.
+- Forms should give immediate validation feedback.
+- Destructive actions require confirmation.
+- Empty states should explain what the user can do next.
+- Mobile-friendly layout is recommended even if desktop is the initial development target.
+
+--------------------------------------------------
+FRONTEND STATE
+--------------------------------------------------
+
+Use TanStack Query for server state.
+
+Use React local state for small UI state.
+
+Do not introduce Redux unless a concrete requirement appears.

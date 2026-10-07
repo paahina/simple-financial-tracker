@@ -1,0 +1,211 @@
+SIMPLE FINANCIAL TRACKER
+Architecture Decisions & Scope Lock
+====================================
+
+DECISION 1 - MERN
+
+Chosen:
+- MongoDB
+- Express.js
+- React.js
+- Node.js
+
+Reason:
+The developer prefers and already knows this ecosystem.
+
+DECISION 2 - JAVASCRIPT
+
+Chosen:
+JavaScript for both React and Express.
+
+Do not introduce TypeScript unless the project requirements change.
+
+DECISION 3 - TRANSACTIONS VS TRANSFERS
+
+Transaction:
+- INCOME
+- EXPENSE
+
+Transfer:
+- Separate entity.
+- fromAccountId
+- toAccountId
+
+Reason:
+A transfer has two accounts and should not affect income/expense reporting.
+
+DECISION 4 - ACCOUNTS VS BALANCES
+
+Use the term Account for:
+- GCash
+- Bank
+- Cash
+- Other manually created money locations
+
+Balance is a calculated state of an Account.
+
+DECISION 5 - REPORTS ARE DERIVED
+
+Do not manually store monthly/yearly totals as the primary source of truth.
+
+Reports are calculated from:
+- transactions
+- transfers where relevant
+- debt/payment data where relevant
+
+DECISION 6 - DEBT PAYMENTS
+
+Debt and DebtPayment are separate.
+
+A debt tracks the obligation.
+
+DebtPayment tracks the history of payments.
+
+The receiving account is selected when recording a payment.
+
+DECISION 7 - MONEY PRECISION
+
+Prefer integer minor units for monetary storage.
+
+For PHP:
+PHP 100.50 -> 10050.
+
+DECISION 8 - NO EXTERNAL FINANCIAL INTEGRATIONS IN MVP
+
+No:
+- bank APIs
+- GCash APIs
+- Maya APIs
+- automatic balance synchronization
+
+All financial data is entered manually.
+
+DECISION 9 - NO REDUX INITIALLY
+
+Use:
+- TanStack Query for server state.
+- React state for local UI state.
+
+Only introduce Redux if an actual requirement appears.
+
+DECISION 10 - NO MICROSERVICES
+
+Use a single React frontend and a single Express backend for MVP.
+
+DECISION 11 - NO OVERENGINEERING
+
+Avoid:
+- microservices
+- event buses
+- queues
+- Redis
+- Kubernetes
+- complex financial/accounting features
+
+unless a real requirement emerges.
+
+--------------------------------------------------
+SCOPE LOCK
+--------------------------------------------------
+
+MVP includes:
+- Authentication
+- Accounts
+- Income
+- Expenses
+- Transfers
+- Categories
+- Debts
+- Debt payments
+- Dashboard
+- Monthly reports
+- Yearly reports
+
+MVP excludes:
+- Bank/e-wallet APIs
+- Budgeting
+- Recurring transactions
+- Investments
+- Cryptocurrency
+- Advanced accounting
+- Currency conversion
+- Shared accounts
+
+This document should be treated as the initial architecture baseline.
+Changes should be intentional and documented.
+
+
+DECISION 12 - MONGODB TTL / STORAGE MANAGEMENT
+
+Chosen:
+Use MongoDB TTL indexes for intentionally temporary data.
+
+Rules:
+- Temporary records should use an explicit expiresAt field.
+- TTL indexes may automatically remove expired temporary records.
+- Do not use TTL to delete financial records based on createdAt or age.
+- Financial history should be preserved unless deletion/archival is explicitly initiated.
+- Use pagination and avoid duplicated calculated report storage to control growth.
+- Monitor storage usage rather than silently deleting financial history.
+
+Typical TTL candidates:
+- password reset tokens
+- email verification tokens
+- temporary uploads
+- temporary/cache records
+
+Reason:
+MongoDB TTL provides automatic cleanup for data that is genuinely temporary while keeping the financial source of truth intact.
+
+DECISION 13 - EXPLICIT EXPIRATION
+
+Use expiresAt for TTL-managed documents instead of relying on createdAt plus a generic retention period.
+
+Reason:
+Different temporary records can have different lifetimes, and expiration becomes explicit in the data model.
+
+--------------------------------------------------
+FRONTEND/BACKEND DEVELOPMENT STRUCTURE LOCK
+--------------------------------------------------
+
+The MVP will use:
+
+Frontend:
+- React + Vite + JavaScript.
+- Layouts for authentication, normal user, and admin experiences.
+- Pages for route-level screens.
+- Reusable components.
+- Domain feature modules for scalable organization.
+- Services for API calls.
+- TanStack Query for server state.
+- React Hook Form + Zod for forms/validation.
+- Protected and role-based routes.
+
+Backend:
+- Express + JavaScript + Mongoose.
+- MVC-style architecture with a Service Layer.
+- Routes -> Middleware -> Controllers -> Services -> Models.
+- Validators for request validation.
+- Centralized error handling.
+- Modular monolith, not microservices.
+
+UI/UX:
+- User and admin experiences use separate layouts/navigation.
+- Admin access is explicitly role-controlled.
+- Admin role does not automatically imply access to personal financial records.
+
+See 13_frontend_development_plan.txt and 14_backend_development_plan.txt.
+
+
+DECISION 12 - APPLICATION NAVIGATION LAYOUTS
+
+User application:
+- Primary navigation uses a top navbar.
+- Do not use a persistent sidebar for normal users in the MVP.
+
+Admin application:
+- Primary navigation uses a persistent left sidebar.
+- Admin pages use AdminLayout and may include a top header for contextual actions.
+
+Reason:
+The user interface is intended to be simple and finance-focused, while the admin interface is an operational management area where sidebar navigation scales better as admin sections grow.

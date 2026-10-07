@@ -1,0 +1,283 @@
+SIMPLE FINANCIAL TRACKER
+Feature Specification
+=====================
+
+FEATURE PRIORITY
+
+P0 = Required for MVP
+P1 = Useful after MVP
+P2 = Future / optional
+
+--------------------------------------------------
+1. AUTHENTICATION & AUTHORIZATION
+--------------------------------------------------
+
+P0 Register
+- User provides name, email, password.
+- Password must be securely hashed.
+- Email must be unique.
+
+P0 Login
+- Authenticate user.
+- Establish authenticated session.
+
+P0 Logout
+- Invalidate the user's authenticated session/token.
+
+P0 User roles
+- SYSTEM_ADMIN
+- USER
+
+P0 Authorization
+- USER can access only their own financial data.
+- Admin endpoints must be explicitly protected.
+
+P1 Profile management
+- Change display name.
+- Change password.
+
+--------------------------------------------------
+2. ACCOUNTS
+--------------------------------------------------
+
+Accounts are the user's manually created sources/stores of money.
+
+Examples:
+- GCash
+- Maya
+- BPI Savings
+- BDO
+- Cash
+
+P0 Create account
+Fields:
+- name
+- type
+- initialBalance
+- currency
+- optional description
+
+P0 Account types
+- CASH
+- E_WALLET
+- BANK
+
+P0 View accounts
+- List active accounts.
+- Show current balance.
+
+P0 Edit account
+- Change name/type/description according to business rules.
+
+P0 Deactivate account
+- Prefer deactivation over destructive deletion when the account has financial history.
+
+P0 Account balance
+Current balance is derived from:
+initial balance
++ income
+- expenses
++ transfers in
+- transfers out
+
+P1 Account transaction history
+- View all activity affecting an account.
+
+--------------------------------------------------
+3. TRANSACTIONS
+--------------------------------------------------
+
+A Transaction represents income or expense.
+
+Transaction types:
+- INCOME
+- EXPENSE
+
+P0 Create transaction
+Fields:
+- accountId
+- type
+- amount
+- label
+- categoryId
+- description/notes
+- transactionDate
+
+P0 Edit transaction
+
+P0 Delete transaction
+- Must update derived balances/reports automatically.
+
+P0 Category
+
+P0 Transaction date
+
+P0 Account selection
+
+P0 Recent transaction list
+
+P1 Search/filter
+- Date range
+- Type
+- Category
+- Account
+- Label
+
+P1 Pagination
+
+--------------------------------------------------
+4. TRANSFERS
+--------------------------------------------------
+
+Transfers are separate from normal transactions.
+
+Reason:
+A transfer does not represent income or expense. It only moves existing money between accounts.
+
+P0 Create transfer
+Fields:
+- fromAccountId
+- toAccountId
+- amount
+- description
+- transactionDate
+
+Rules:
+- Source and destination must be different accounts.
+- Both accounts must belong to the authenticated user.
+- Amount must be positive.
+- Transfer must affect both account balances.
+- Transfer must not count as income or expense.
+
+P0 Edit transfer
+
+P0 Delete/cancel transfer
+
+P1 Transfer history
+
+--------------------------------------------------
+5. CATEGORIES
+--------------------------------------------------
+
+Categories are used for transaction reporting.
+
+Suggested expense categories:
+- Food
+- Transportation
+- Bills
+- Shopping
+- Entertainment
+- Health
+- Education
+- Subscriptions
+- Other
+
+Suggested income categories:
+- Salary
+- Freelance
+- Business
+- Interest
+- Gift
+- Other
+
+P0 Category assignment
+
+P1 User-managed categories
+- Create
+- Rename
+- Deactivate
+
+--------------------------------------------------
+6. DEBTS / RECEIVABLES
+--------------------------------------------------
+
+This feature tracks money other people owe the user.
+
+P0 Create debt
+Fields:
+- personName
+- description
+- originalAmount
+- dueDate
+
+P0 Debt status
+- PENDING
+- PARTIALLY_PAID
+- PAID
+- OVERDUE
+
+P0 Record debt payment
+Fields:
+- debtId
+- amount
+- paymentDate
+- accountId
+- notes
+
+P0 Remaining amount
+remaining = original amount - recorded payments
+
+P0 Payment history
+
+P1 Search/filter debts
+
+--------------------------------------------------
+7. DASHBOARD
+--------------------------------------------------
+
+P0 Total money
+- Sum of active account balances.
+
+P0 Monthly income
+
+P0 Monthly expenses
+
+P0 Monthly net
+- income - expenses
+
+P0 Outstanding receivables
+
+P0 Account balance cards
+
+P0 Recent transactions
+
+P1 Monthly spending chart
+
+P1 Expense category breakdown
+
+P1 Income category breakdown
+
+--------------------------------------------------
+8. REPORTS
+--------------------------------------------------
+
+P0 Monthly report
+- Total income
+- Total expenses
+- Net
+- Income by category
+- Expenses by category
+
+P0 Yearly report
+- Total income
+- Total expenses
+- Net
+- Monthly comparison
+
+P1 Date-range custom report
+
+P1 Export
+- CSV/PDF can be considered later.
+
+--------------------------------------------------
+9. FUTURE FEATURES
+--------------------------------------------------
+
+P2 Recurring transactions
+P2 Budgeting
+P2 Notifications/reminders
+P2 Multi-currency support
+P2 Shared financial accounts
+P2 Import/export
+P2 Bank/e-wallet integrations
+P2 Advanced analytics

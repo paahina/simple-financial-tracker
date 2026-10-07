@@ -1,0 +1,380 @@
+SIMPLE FINANCIAL TRACKER
+Frontend Development Plan
+=========================
+
+1. FRONTEND ARCHITECTURE GOAL
+
+The frontend should be organized for scalability without over-engineering the MVP.
+
+Stack:
+- React.js
+- JavaScript
+- Vite
+- React Router
+- TanStack Query
+- React Hook Form
+- Zod
+- Tailwind CSS
+- shadcn/ui
+- Recharts
+
+Primary architectural rule:
+- Pages compose features.
+- Components provide reusable UI.
+- Services communicate with the API.
+- Hooks coordinate reusable client/server behavior.
+- Layouts define application shells.
+- Business calculations do not live inside page components.
+
+--------------------------------------------------
+2. RECOMMENDED FRONTEND FOLDER STRUCTURE
+--------------------------------------------------
+
+client/
+└── src/
+    ├── assets/
+    ├── components/
+    │   ├── common/
+    │   ├── forms/
+    │   ├── feedback/
+    │   ├── navigation/
+    │   ├── finance/
+    │   └── charts/
+    ├── layouts/
+    │   ├── AuthLayout.jsx
+    │   ├── UserLayout.jsx
+    │   ├── AdminLayout.jsx
+    │   └── ErrorLayout.jsx
+    ├── pages/
+    │   ├── auth/
+    │   ├── user/
+    │   └── admin/
+    ├── features/
+    │   ├── auth/
+    │   ├── accounts/
+    │   ├── transactions/
+    │   ├── transfers/
+    │   ├── debts/
+    │   ├── reports/
+    │   └── dashboard/
+    ├── services/
+    │   ├── apiClient.js
+    │   ├── authService.js
+    │   ├── accountService.js
+    │   ├── transactionService.js
+    │   ├── transferService.js
+    │   ├── categoryService.js
+    │   ├── debtService.js
+    │   ├── dashboardService.js
+    │   └── reportService.js
+    ├── hooks/
+    ├── context/
+    ├── routes/
+    │   ├── AppRoutes.jsx
+    │   ├── ProtectedRoute.jsx
+    │   └── RoleRoute.jsx
+    ├── utils/
+    │   ├── formatCurrency.js
+    │   ├── formatDate.js
+    │   └── validation.js
+    ├── App.jsx
+    └── main.jsx
+
+The feature folders are introduced so a growing feature can keep its own forms,
+queries, hooks, and smaller components together instead of creating a huge global
+components directory.
+
+--------------------------------------------------
+3. RESPONSIBILITY OF EACH LAYER
+--------------------------------------------------
+
+pages/
+- Route-level screens.
+- Compose layouts and feature components.
+- Avoid direct fetch calls and financial calculations.
+
+layouts/
+- Define page shell, navigation, header, sidebar, content area, and responsive behavior.
+- UserLayout is for normal financial tracking.
+- AdminLayout is for system administration.
+- AuthLayout is for login/register flows.
+
+components/
+- Reusable presentation and interaction components.
+- Examples: Button, Modal, DataTable, ConfirmDialog, MoneyCard, EmptyState.
+
+features/
+- Domain-specific UI modules.
+- Examples: AccountForm, TransactionTable, DebtPaymentForm, ReportFilters.
+- Feature logic should stay close to the feature when it is not globally reusable.
+
+services/
+- API request functions only.
+- Services should not render UI.
+- Keep endpoint details out of components.
+
+hooks/
+- TanStack Query hooks and reusable React behavior.
+- Examples: useCurrentUser, useAccounts, useTransactions, useDebts.
+
+context/
+- Only genuinely global client state.
+- Do not use Context as a replacement for TanStack Query server state.
+
+utils/
+- Small pure helpers such as formatting and non-domain-specific utilities.
+
+routes/
+- Central route definitions.
+- Authentication and role guards.
+
+--------------------------------------------------
+4. USER APPLICATION UI/UX
+--------------------------------------------------
+
+The normal user experience is the primary MVP experience.
+
+Desktop shell:
+- Top navbar navigation.
+- Brand/app name on the left.
+- Primary navigation links centered or grouped in the navbar.
+- User profile/menu and logout on the right.
+- Main content area below the navbar.
+
+Mobile shell:
+- Compact top navbar.
+- Navigation collapses into a menu/drawer.
+- Content remains vertically organized.
+
+Locked UI decision:
+- USER interface uses a NAVBAR as the primary application navigation.
+- Do not use a persistent sidebar for the normal user application in MVP.
+
+Primary navigation:
+1. Dashboard
+2. Accounts
+3. Transactions
+4. Transfers
+5. Debts
+6. Reports
+
+Secondary/navigation utilities:
+- Profile/account settings when implemented.
+- Logout.
+
+Dashboard UX:
+- Total money across active accounts.
+- Monthly income.
+- Monthly expenses.
+- Monthly net.
+- Money owed to the user.
+- Account balance cards.
+- Recent transactions.
+- Simple charts.
+- Primary quick actions: Add Income, Add Expense, Transfer, Add Debt.
+
+Accounts UX:
+- Card/table view of accounts.
+- Clear balance and account type.
+- Create/edit/deactivate actions.
+- Account detail page with activity.
+
+Transactions UX:
+- Filterable transaction table.
+- Clear visual distinction between income and expense.
+- Add/edit form in a modal or dedicated form page depending on screen size.
+- Confirmation before destructive actions.
+
+Transfers UX:
+- Explicit From and To fields.
+- Prevent selecting the same account.
+- Clearly explain that a transfer does not count as income or expense.
+
+Debts UX:
+- List outstanding debts prominently.
+- Show original, paid, remaining, due date, and status.
+- Debt detail page shows payment history.
+- Add Payment action clearly identifies the receiving account.
+
+Reports UX:
+- Monthly/yearly selector.
+- Summary numbers first.
+- Charts second.
+- Tables or readable lists for exact values.
+
+--------------------------------------------------
+5. ADMIN APPLICATION UI/UX
+--------------------------------------------------
+
+The admin interface is intentionally separate from the personal finance interface.
+
+Admin navigation should initially be minimal and use a persistent SIDEBAR:
+1. Admin Dashboard
+2. Users
+
+Admin Dashboard MVP purpose:
+- System-level overview only.
+- User count.
+- Basic system health/operational indicators if available.
+- Storage/temporary-data status when implemented.
+
+Users page:
+- User list.
+- Search/filter where needed.
+- User name/email/role/status.
+- Account creation date.
+- Admin actions permitted by the security model.
+
+Important rule:
+- Admin UI must not imply unrestricted access to users' personal financial records.
+- Any financial-data administration capability must be explicitly designed and authorized later.
+- Do not expose financial information to admins merely because they have SYSTEM_ADMIN role.
+
+Admin shell:
+- Separate AdminLayout.
+- Persistent left sidebar as the primary navigation.
+- Top admin header for page title, profile/menu, and contextual actions.
+- Visible admin role indicator.
+- Strong distinction from the normal user's finance dashboard.
+
+Locked UI decision:
+- ADMIN interface uses a SIDEBAR as the primary application navigation.
+- Sidebar should be collapsible on smaller desktop widths and become a drawer on mobile.
+
+--------------------------------------------------
+6. ROUTING PLAN
+--------------------------------------------------
+
+Public:
+- /login
+- /register
+
+Authenticated user:
+- /dashboard
+- /accounts
+- /accounts/:accountId
+- /transactions
+- /transfers
+- /debts
+- /debts/:debtId
+- /reports
+
+Admin:
+- /admin
+- /admin/users
+
+Route guards:
+- ProtectedRoute checks authentication.
+- RoleRoute checks required role.
+- Unauthorized users are redirected to an appropriate screen.
+
+--------------------------------------------------
+7. DATA FETCHING AND STATE
+--------------------------------------------------
+
+Server state:
+- TanStack Query.
+
+Examples:
+- accounts list
+- transactions list
+- debts
+- dashboard data
+- reports
+
+Local UI state:
+- modal open/closed
+- selected row
+- filter drawer state
+- temporary form UI state
+
+Authentication state:
+- Current-user query can be the source of truth for the authenticated user.
+
+Do not duplicate API data into large React Context objects without a concrete reason.
+
+--------------------------------------------------
+8. FORM AND VALIDATION STRATEGY
+--------------------------------------------------
+
+Use React Hook Form for forms.
+Use Zod for client-side schema validation.
+
+Important forms:
+- Login
+- Register
+- Account
+- Category
+- Transaction
+- Transfer
+- Debt
+- Debt payment
+
+Client validation improves UX but does not replace backend validation.
+
+--------------------------------------------------
+9. REUSABLE UI COMPONENTS
+--------------------------------------------------
+
+Build a small design system around:
+- Button
+- Input
+- Select
+- DatePicker
+- CurrencyInput
+- FormField
+- Modal/Dialog
+- ConfirmDialog
+- Card
+- Badge
+- DataTable
+- Pagination
+- EmptyState
+- LoadingState
+- ErrorState
+- Toast/notification
+- PageHeader
+- Sidebar
+- Topbar
+- MoneySummaryCard
+
+Financial-specific reusable components:
+- AccountCard
+- TransactionRow
+- TransactionTable
+- BalanceDisplay
+- DebtStatusBadge
+- DebtPaymentTable
+- ReportSummary
+- CategoryBreakdownChart
+
+Avoid creating components for every tiny HTML wrapper. Extract components when they are reused or represent a meaningful domain/UI concept.
+
+--------------------------------------------------
+10. FRONTEND DEVELOPMENT RULES
+--------------------------------------------------
+
+- Keep route pages thin.
+- Keep API calls in services.
+- Keep reusable server-state logic in query hooks.
+- Keep financial calculations on the backend unless a pure display calculation is required.
+- Reuse common UI components.
+- Keep feature-specific UI close to its feature.
+- Do not introduce Redux unless a concrete requirement appears.
+- Keep accessibility in mind for forms, dialogs, tables, navigation, and keyboard use.
+- Make desktop and mobile layouts responsive.
+
+--------------------------------------------------
+11. SCALABILITY RULE
+--------------------------------------------------
+
+Start simple, but organize by responsibility and domain.
+
+The structure should allow future additions such as:
+- budgets/
+- recurring-transactions/
+- imports/
+- notifications/
+- multi-currency/
+
+without restructuring the entire frontend.

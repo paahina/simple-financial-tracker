@@ -1,0 +1,133 @@
+SIMPLE FINANCIAL TRACKER
+Business Rules
+===============
+
+1. ACCOUNT BALANCE
+
+For an account:
+
+balance =
+initialBalance
++ income
+- expenses
++ transfersIn
+- transfersOut
++ debtPaymentsReceived
+
+The exact treatment of debt payments in income reporting is separate from account balance calculation.
+
+2. TOTAL USER MONEY
+
+Total money is the sum of active account balances.
+
+Outstanding debts are NOT part of current cash/account balance.
+
+Example:
+Accounts = PHP 40,000
+Others owe user = PHP 5,000
+
+Current money = PHP 40,000
+Receivables = PHP 5,000
+Potential total resources = PHP 45,000
+
+The dashboard should keep these concepts distinct.
+
+3. INCOME
+
+Income increases an account.
+
+Examples:
+- Salary
+- Freelance payment
+- Business income
+- Interest
+- Gift
+
+4. EXPENSE
+
+Expense decreases an account.
+
+Examples:
+- Food
+- Transportation
+- Bills
+- Shopping
+
+5. TRANSFER
+
+Transfer moves money between the user's own accounts.
+
+Example:
+BPI PHP 20,000 -> GCash PHP 2,000
+
+After:
+BPI PHP 18,000
+GCash increases by PHP 2,000
+
+Total account money is unchanged.
+
+6. DEBT
+
+A debt is money another person owes the user.
+
+originalAmount is fixed after creation except through an explicit edit operation.
+
+remainingAmount is derived from:
+originalAmount - sum(payments)
+
+7. DEBT PAYMENT
+
+A payment reduces the debt.
+
+Example:
+Debt = PHP 5,000
+Payment = PHP 2,000
+Remaining = PHP 3,000
+
+The selected receiving account increases by PHP 2,000.
+
+8. REPORTING
+
+Income and expense reports use normal transactions.
+
+Transfers are excluded.
+
+Debt balances are shown separately.
+
+Debt payments should be shown separately unless the reporting design explicitly classifies them as income.
+
+9. DATES
+
+Use a transaction/payment date for when the financial event occurred.
+
+Use createdAt/updatedAt for record lifecycle metadata.
+
+Do not substitute createdAt for transactionDate in financial reporting.
+
+10. DELETION
+
+Editing/deleting financial records must update derived reports.
+
+Where possible, prefer cancellation/soft deletion for important financial history rather than irreversible destruction.
+
+11. CURRENCY
+
+MVP can default to PHP.
+
+Store currency explicitly on accounts so future multi-currency support remains possible.
+
+Do not implement currency conversion in MVP.
+
+12. USER OWNERSHIP
+
+Every account, transaction, transfer, category, debt, and debt payment belongs to a user.
+
+The server derives ownership from authentication.
+
+13. CATEGORIES
+
+Expense transactions use expense categories.
+
+Income transactions use income categories.
+
+Transfers do not require a normal income/expense category.

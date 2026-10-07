@@ -1,0 +1,146 @@
+SIMPLE FINANCIAL TRACKER
+Technology Stack
+================
+
+CORE STACK: MERN + JAVASCRIPT
+
+Frontend:
+- React.js
+- JavaScript
+- Vite
+
+Backend:
+- Node.js
+- Express.js
+- JavaScript
+
+Database:
+- MongoDB
+
+Database ODM:
+- Mongoose
+
+--------------------------------------------------
+FRONTEND SUPPORTING LIBRARIES
+--------------------------------------------------
+
+React Router
+Purpose:
+- Client-side page routing.
+
+TanStack Query
+Purpose:
+- Server-state fetching, caching, invalidation, and synchronization.
+
+React Hook Form
+Purpose:
+- Form state and submission handling.
+
+Zod
+Purpose:
+- Input validation.
+- Can be used on the frontend and backend.
+
+Tailwind CSS
+Purpose:
+- Utility-first styling.
+
+shadcn/ui
+Purpose:
+- Reusable UI components.
+
+Recharts
+Purpose:
+- Dashboard and report charts.
+
+Axios OR fetch
+Purpose:
+- HTTP communication.
+Recommendation:
+- Use one consistently rather than mixing both without a reason.
+
+--------------------------------------------------
+BACKEND SUPPORTING LIBRARIES
+--------------------------------------------------
+
+Mongoose
+- MongoDB schema/model layer.
+
+Authentication
+- JWT-based authentication can be used.
+- Prefer secure HTTP-only cookies for browser authentication.
+
+Password hashing
+- bcrypt or Argon2.
+- Use one library consistently.
+
+Security
+- helmet
+- cors
+- rate limiting
+
+Validation
+- Zod
+
+Environment configuration
+- dotenv
+
+Logging
+- A simple structured logger can be added if needed.
+
+--------------------------------------------------
+TESTING
+--------------------------------------------------
+
+Unit/component tests:
+- Vitest
+- React Testing Library
+
+Backend/API tests:
+- Supertest
+
+End-to-end:
+- Playwright
+
+Testing priority:
+1. Financial calculation/business rules
+2. Authentication/authorization
+3. Account/transaction/transfer behavior
+4. Critical UI flows
+
+--------------------------------------------------
+CODE QUALITY
+--------------------------------------------------
+
+ESLint
+Prettier
+
+Even though the project uses JavaScript, maintain consistent:
+- naming
+- folder structure
+- error handling
+- validation
+- module responsibilities
+
+--------------------------------------------------
+DEPLOYMENT
+--------------------------------------------------
+
+Frontend:
+- Can be deployed using a static/React-capable hosting platform.
+
+Backend:
+- Node.js/Express-capable hosting.
+
+Database:
+- Managed MongoDB.
+
+The exact providers can be chosen later.
+
+--------------------------------------------------
+IMPORTANT DECISION
+--------------------------------------------------
+
+The project intentionally uses JavaScript rather than TypeScript because the developer prefers JavaScript.
+
+Do not introduce TypeScript unless the project requirements change.

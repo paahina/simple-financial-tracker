@@ -1,0 +1,229 @@
+SIMPLE FINANCIAL TRACKER
+Application Architecture
+========================
+
+1. HIGH-LEVEL ARCHITECTURE
+
+Browser
+  |
+  v
+React.js application
+  |
+  | HTTP/JSON
+  v
+Express.js API
+  |
+  v
+Service / business logic
+  |
+  v
+Mongoose
+  |
+  v
+MongoDB
+
+2. REPOSITORY STRUCTURE
+
+financial-tracker/
+|
+├── client/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── layouts/
+│   │   ├── hooks/
+│   │   ├── services/
+│   │   ├── utils/
+│   │   ├── context/
+│   │   ├── routes/
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   └── package.json
+|
+├── server/
+│   ├── config/
+│   ├── models/
+│   ├── controllers/
+│   ├── services/
+│   ├── routes/
+│   ├── middleware/
+│   ├── validators/
+│   ├── utils/
+│   ├── app.js
+│   └── server.js
+|
+├── docs/
+├── .env.example
+├── .gitignore
+└── README.md
+
+3. BACKEND RESPONSIBILITIES
+
+Routes
+- Define HTTP endpoints.
+- Apply authentication/authorization middleware.
+- Delegate work to controllers.
+
+Controllers
+- Read request data.
+- Call services.
+- Return HTTP responses.
+
+Services
+- Contain business logic.
+- Perform financial calculations.
+- Enforce business rules.
+- Coordinate multiple models where necessary.
+
+Models
+- Define MongoDB/Mongoose schemas.
+- Define indexes and model-level constraints where appropriate.
+
+Validators
+- Validate incoming request data.
+
+Middleware
+- Authentication.
+- Authorization.
+- Error handling.
+- Rate limiting/security middleware.
+
+4. FRONTEND RESPONSIBILITIES
+
+Pages
+- Represent application screens.
+
+Components
+- Reusable UI.
+
+Services
+- API communication.
+
+Hooks
+- Reusable React/TanStack Query logic.
+
+Context
+- Only for genuinely global client state where needed.
+
+5. IMPORTANT RULE
+
+Do not put financial business calculations directly inside React components.
+
+For example, balance calculations belong in backend services or shared, well-tested calculation utilities.
+
+6. STORAGE MANAGEMENT
+
+Use MongoDB TTL indexes for intentionally temporary records.
+
+Temporary records should use expiresAt rather than a generic createdAt age rule.
+
+Do not use TTL to automatically delete financial history.
+
+The application should also use pagination for financial-history endpoints and avoid storing duplicated calculated report data.
+
+See 12_storage_management.txt for the complete retention strategy.
+
+7. FINANCIAL SOURCE OF TRUTH
+
+The primary financial records are:
+- Account initial balance
+- Transactions
+- Transfers
+- Debt payments
+
+Reports are derived from these records.
+
+8. ACCOUNT BALANCE
+
+Conceptually:
+
+currentBalance =
+initialBalance
++ income
+- expenses
++ transfersIn
+- transfersOut
+
+If a cached balance is eventually maintained for performance, it must be treated as a derived/cache value and kept consistent with source records.
+
+9. TRANSFER RULE
+
+Transfer is a distinct domain operation.
+
+It contains:
+- source account
+- destination account
+- amount
+
+It does not count as:
+- income
+- expense
+
+10. API STYLE
+
+Use REST-style JSON APIs.
+
+Example:
+GET /api/accounts
+POST /api/accounts
+GET /api/accounts/:id
+PATCH /api/accounts/:id
+DELETE /api/accounts/:id
+
+Use consistent success and error response formats.
+
+11. ERROR HANDLING
+
+Centralize Express error handling.
+
+Do not expose:
+- stack traces
+- database internals
+- sensitive authentication information
+
+Return useful client-facing error messages with appropriate HTTP status codes.
+
+12. DETAILED DEVELOPMENT ARCHITECTURE
+
+The high-level architecture is intentionally expanded into two implementation plans:
+
+- 13_frontend_development_plan.txt
+  - scalable React folder structure
+  - layouts
+  - pages
+  - reusable components
+  - feature modules
+  - services/hooks/state
+  - user UI/UX
+  - admin UI/UX
+  - routing and role guards
+
+- 14_backend_development_plan.txt
+  - MVC + Service Layer structure
+  - models
+  - controllers
+  - routes
+  - services
+  - validators
+  - middleware
+  - admin backend
+  - testing and scalability rules
+
+These documents are the implementation-level companion to this architecture document.
+
+
+6. APPLICATION SHELLS
+
+User UI:
+- UserLayout is the primary authenticated application shell.
+- Primary navigation is a top navbar.
+- Main content is displayed below the navbar.
+- Mobile navigation collapses into a menu/drawer.
+
+Admin UI:
+- AdminLayout is a separate application shell.
+- Primary navigation is a persistent left sidebar.
+- A top header may contain page title, profile/menu, and contextual actions.
+- On mobile, the sidebar becomes a drawer.
+
+This separation is an intentional MVP UI/UX decision and should remain consistent across all pages.

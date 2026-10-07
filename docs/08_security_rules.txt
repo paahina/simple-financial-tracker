@@ -1,0 +1,138 @@
+SIMPLE FINANCIAL TRACKER
+Security & Data Integrity Rules
+================================
+
+1. AUTHENTICATION
+
+Passwords:
+- Never store plaintext passwords.
+- Hash passwords using bcrypt or Argon2.
+- Never return passwordHash from API responses.
+
+Browser authentication:
+- Prefer secure HTTP-only cookies for JWT/session credentials.
+- Use Secure and SameSite settings appropriate to deployment.
+
+2. AUTHORIZATION
+
+Every protected financial resource must be scoped to the authenticated user.
+
+Bad:
+GET /transactions/:id
+then return the document only because the ID exists.
+
+Good:
+Find transaction where:
+- _id = requested id
+- userId = authenticated user id
+
+The client must never be trusted to define ownership.
+
+3. VALIDATION
+
+Validate:
+- amount
+- dates
+- IDs
+- account ownership
+- category ownership/type
+- transfer source/destination
+- debt payment amount
+- required strings
+
+Use Zod and/or Mongoose validation.
+
+4. MONEY
+
+Prefer integer minor units.
+
+Example:
+PHP 100.50 = 10050.
+
+Never rely on uncontrolled floating-point arithmetic for financial totals.
+
+5. TRANSACTION INTEGRITY
+
+Expense:
+- decreases account balance.
+
+Income:
+- increases account balance.
+
+Transfer:
+- decreases source account.
+- increases destination account.
+- does not affect total user money.
+- does not affect income/expense totals.
+
+Debt payment:
+- records payment against a debt.
+- increases the receiving account.
+- remaining debt must not become negative.
+
+6. TRANSFER SAFETY
+
+Reject:
+- source == destination
+- account not owned by user
+- inactive account if business rules disallow it
+- amount <= 0
+
+7. DEBT SAFETY
+
+Reject:
+- payment <= 0
+- payment greater than remaining debt unless overpayment is explicitly supported
+
+Automatically determine:
+- PENDING
+- PARTIALLY_PAID
+- PAID
+- OVERDUE
+
+8. SECURITY MIDDLEWARE
+
+Recommended:
+- Helmet
+- CORS configuration
+- Rate limiting
+- Request body limits
+- Input validation
+- Central error handling
+
+9. SENSITIVE INFORMATION
+
+Do not log:
+- passwords
+- authentication tokens
+- sensitive financial payloads unnecessarily
+
+10. API ERRORS
+
+Do not expose:
+- stack traces in production
+- raw database errors
+- internal implementation details
+
+11. DATABASE
+
+Use indexes for expected queries.
+
+Backups should be handled by the selected MongoDB hosting solution.
+
+12. ADMIN
+
+Admin access should be role-based.
+
+Do not assume SYSTEM_ADMIN should automatically have access to every user's financial records. Define and enforce the minimum access needed.
+
+
+--------------------------------------------------
+TTL / EXPIRING SECURITY DATA
+--------------------------------------------------
+
+Temporary authentication/security records such as password-reset or email-verification tokens may use MongoDB TTL indexes with an explicit expiresAt field.
+
+The application must still validate token expiration when the token is used. MongoDB TTL cleanup is eventual and should not be treated as the security check itself.
+
+Do not apply automatic age-based deletion to financial records.
