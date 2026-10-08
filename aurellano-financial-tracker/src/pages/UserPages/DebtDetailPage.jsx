@@ -56,7 +56,7 @@ const DebtDetailPage = () => {
   };
 
   if (error && !debt) return <ErrorText message={error} />;
-  if (!debt) return <Loading />;
+  if (!debt) return <Loading variant="detail" />;
 
   return (
     <section className="space-y-6">

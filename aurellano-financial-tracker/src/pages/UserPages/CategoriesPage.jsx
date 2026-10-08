@@ -55,7 +55,7 @@ const CategoriesPage = () => {
         </Link>
       </div>
       <ErrorText message={error} />
-      {!categories && <Loading />}
+      {!categories && !error && <Loading variant="list" />}
       {categories?.length === 0 && <Empty label="No categories yet." />}
       <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-neutral-0">
         {categories?.map((category) => (

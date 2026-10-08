@@ -5,7 +5,7 @@ import { Loading } from './StatusMessage';
 const ProtectedRoute = ({ roles }) => {
   const { user, loading } = useAuth();
 
-  if (loading) return <Loading label="Checking your session..." />;
+  if (loading) return <Loading variant="session" label="Checking your session" />;
   if (!user) return <Navigate to="/auth/signin" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
 

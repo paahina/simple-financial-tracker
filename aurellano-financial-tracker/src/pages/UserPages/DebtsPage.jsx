@@ -127,7 +127,7 @@ const DebtsPage = () => {
       <h1 className="text-2xl font-semibold text-primary-shade">Debts</h1>
       <p className="text-sm text-neutral-500">This is money other people owe you. It is separate from the cash in your accounts.</p>
       <ErrorText message={error} />
-      {!debts && <Loading />}
+      {!debts && !error && <Loading variant="list" />}
       {debts?.length === 0 && <Empty label="Nobody owes you money yet." />}
       <ul className="space-y-3">
         {debts?.map((debt) => (

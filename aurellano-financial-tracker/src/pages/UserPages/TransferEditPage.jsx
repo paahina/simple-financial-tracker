@@ -88,7 +88,7 @@ const TransferEditPage = () => {
   return (
     <FormModal dirty={dirty} closeTo="/transfers">
       {error && !form && <ErrorText message={error} />}
-      {!form && !error && <Loading />}
+      {!form && !error && <Loading variant="form" />}
       {form && (
     <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
       <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit transfer</h1>

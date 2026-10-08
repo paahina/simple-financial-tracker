@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import Money from '../../components/Money';
 import PagedGrid from '../../components/PagedGrid';
-import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
+import { Loading } from '../../components/Skeleton';
+import { Empty, ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { getDashboardRequest, getTransactionsRequest } from '../../services/api';
 import { formatDateTime, formatPeso } from '../../utils/format';
@@ -65,8 +66,8 @@ const DashboardPage = () => {
     };
   }, [token, paginationModel]);
 
-  if (error) return <ErrorText message={error} />;
-  if (!data) return <Loading />;
+  if (error && !data) return <ErrorText message={error} />;
+  if (!data) return <Loading variant="dashboard" />;
 
   const cards = [
     ['Cash on hand', data.totalMoney],

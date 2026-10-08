@@ -85,7 +85,7 @@ const AccountsPage = () => {
       <div>
         <h1 className="mb-4 text-2xl font-semibold text-primary-shade">Accounts</h1>
         <ErrorText message={error} />
-        {!accounts && <Loading />}
+        {!accounts && !error && <Loading variant="list" />}
         {accounts?.length === 0 && <Empty label="No accounts yet." />}
         <ul className="space-y-3">
           {accounts?.map((account) => (

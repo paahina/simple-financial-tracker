@@ -2,7 +2,8 @@ import { BarChart } from '@mui/x-charts/BarChart';
 import { useEffect, useState } from 'react';
 import Field, { inputClass } from '../../components/Field';
 import PagedGrid from '../../components/PagedGrid';
-import { ErrorText, Loading } from '../../components/StatusMessage';
+import { Loading } from '../../components/Skeleton';
+import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { getMonthlyReportRequest, getYearlyReportRequest } from '../../services/api';
 import { formatDate, formatPeso } from '../../utils/format';
@@ -102,7 +103,7 @@ const ReportsPage = () => {
         </Field>
       </div>
       <ErrorText message={error} />
-      {!monthly && !error && <Loading />}
+      {!monthly && !error && <Loading variant="reports" />}
       {monthly && (
         <div className="grid gap-4 sm:grid-cols-3">
           {[
