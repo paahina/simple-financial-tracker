@@ -118,6 +118,7 @@ const DebtDetailPage = () => {
           <p className="text-sm text-neutral-500">
             {debt.status} · {debt.dueDate ? `due ${formatDate(debt.dueDate)}` : 'No due date'}
           </p>
+          {debt.description?.trim() ? <p className="mt-2 font-semibold text-primary">{debt.description}</p> : null}
           <p className="mt-2">
             Remaining {formatPeso(debt.remainingAmount)} of {formatPeso(debt.totalAmount)}
           </p>
