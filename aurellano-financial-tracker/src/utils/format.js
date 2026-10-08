@@ -68,6 +68,7 @@ export const localDayBoundsIso = (dateStr) => {
 export const formatDayKey = (dateStr) => {
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day).toLocaleDateString('en-PH', {
+    weekday: 'long',
     year: 'numeric',
     month: 'short',
     day: 'numeric',

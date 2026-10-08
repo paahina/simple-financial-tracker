@@ -2,24 +2,44 @@ import { Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
-import PagedGrid from '../../components/PagedGrid';
+import DayEntriesModal from '../../components/DayEntriesModal';
+import DayGroupList from '../../components/DayGroupList';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
-import { deleteTransferRequest, getAccountsRequest, getTransfersRequest } from '../../services/api';
-import { formatDateTime, formatPeso } from '../../utils/format';
+import {
+  deleteTransferRequest,
+  getAccountsRequest,
+  getTransferDaysRequest,
+  getTransfersRequest,
+} from '../../services/api';
+import { formatDateTime, formatDayKey, formatPeso, localDayBoundsIso } from '../../utils/format';
+
+const collectPages = async (requestPage) => {
+  const first = await requestPage(1);
+  let data = first.data;
+  for (let page = 2; page <= first.totalPages; page += 1) {
+    const next = await requestPage(page);
+    data = data.concat(next.data);
+  }
+  return data;
+};
 
 const TransfersPage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
   const confirm = useConfirm();
-  const [rows, setRows] = useState([]);
+  const [days, setDays] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [accounts, setAccounts] = useState([]);
   const [error, setError] = useState('');
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [entries, setEntries] = useState([]);
+  const [dayLoading, setDayLoading] = useState(false);
 
   useEffect(() => {
     getAccountsRequest(token)
@@ -29,18 +49,34 @@ const TransfersPage = () => {
 
   const load = useCallback(() => {
     setLoading(true);
-    return getTransfersRequest(token, paginationModel.page + 1, paginationModel.pageSize)
-      .then((transfers) => {
-        setRows(transfers.data.map((item) => ({ ...item, id: item._id })));
-        setTotal(transfers.total);
+    return getTransferDaysRequest(token, page + 1, pageSize)
+      .then((result) => {
+        setDays(result.data);
+        setTotal(result.total);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [token, paginationModel]);
+  }, [token, page, pageSize]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadEntries = useCallback(
+    (date) => {
+      setDayLoading(true);
+      const range = localDayBoundsIso(date);
+      return collectPages((pageNumber) => getTransfersRequest(token, pageNumber, 100, range))
+        .then(setEntries)
+        .catch((err) => setError(err.message))
+        .finally(() => setDayLoading(false));
+    },
+    [token],
+  );
+
+  useEffect(() => {
+    if (selectedDay) loadEntries(selectedDay.date);
+  }, [selectedDay, loadEntries]);
 
   const nameOf = (accountId) => accounts.find((account) => account._id === accountId)?.name || 'Account';
   const sourceOf = (item) => (item.senderName ? `other: ${item.senderName}` : nameOf(item.fromAccountId));
@@ -59,9 +95,16 @@ const TransfersPage = () => {
     try {
       await deleteTransferRequest(transferId, token);
       notify('Transfer deleted');
-      if (rows.length === 1 && paginationModel.page > 0) {
-        setPaginationModel((model) => ({ ...model, page: model.page - 1 }));
-        return;
+      const remaining = entries.filter((item) => item._id !== transferId);
+      if (!remaining.length) {
+        setSelectedDay(null);
+        setEntries([]);
+        if (days.length === 1 && page > 0) {
+          setPage((current) => current - 1);
+          return;
+        }
+      } else {
+        setEntries(remaining);
       }
       await load();
     } catch (err) {
@@ -83,59 +126,45 @@ const TransfersPage = () => {
         </Link>
       </div>
       <ErrorText message={error} />
-      <div className="rounded-lg border border-neutral-200 bg-neutral-0">
-        <PagedGrid
-          rows={rows}
-          rowCount={total}
-          loading={loading}
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          localeText={{ noRowsLabel: 'No transfers yet.' }}
-          columns={[
-            {
-              field: 'movement',
-              headerName: 'Transfer',
-              flex: 1,
-              minWidth: 180,
-              sortable: false,
-              filterable: false,
-              renderCell: ({ row }) => `${sourceOf(row)} to ${destinationOf(row)}`,
-            },
-            {
-              field: 'transactionDate',
-              headerName: 'Date',
-              flex: 1,
-              minWidth: 170,
-              sortable: false,
-              filterable: false,
-              renderCell: ({ row }) => formatDateTime(row.transactionDate),
-            },
-            {
-              field: 'amount',
-              headerName: 'Amount',
-              width: 120,
-              sortable: false,
-              filterable: false,
-              renderCell: ({ row }) => formatPeso(row.amount),
-            },
-            {
-              field: 'actions',
-              headerName: '',
-              width: 210,
-              sortable: false,
-              filterable: false,
-              renderCell: ({ row }) => (
-                <span className="flex items-center gap-2">
-                  <EditLink to={`/transfers/${row.id}/edit`}>Edit</EditLink>
-                  <Button variant="danger" icon={Trash2} onClick={() => onDelete(row.id)}>
+      <DayGroupList
+        days={days}
+        loading={loading}
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        amountLabel="Total"
+        emptyLabel="No transfers yet."
+        onOpen={setSelectedDay}
+        onPageChange={(nextPage, nextSize) => {
+          setPage(nextPage);
+          setPageSize(nextSize);
+        }}
+      />
+      {selectedDay && (
+        <DayEntriesModal
+          title={formatDayKey(selectedDay.date)}
+          loading={dayLoading}
+          onClose={() => setSelectedDay(null)}
+        >
+          <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200">
+            {entries.map((item) => (
+              <li key={item._id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                <span>
+                  {sourceOf(item)} to {destinationOf(item)}
+                  <span className="ml-2 text-neutral-500">{formatDateTime(item.transactionDate)}</span>
+                </span>
+                <span className="flex items-center gap-3">
+                  {formatPeso(item.amount)}
+                  <EditLink to={`/transfers/${item._id}/edit`}>Edit</EditLink>
+                  <Button variant="danger" icon={Trash2} onClick={() => onDelete(item._id)}>
                     Delete
                   </Button>
                 </span>
-              ),
-            },
-          ]}
-        />
-      </div>
+              </li>
+            ))}
+          </ul>
+        </DayEntriesModal>
+      )}
     </section>
   );
 };

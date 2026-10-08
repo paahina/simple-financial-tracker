@@ -2,38 +2,73 @@ import { Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
-import PagedGrid from '../../components/PagedGrid';
+import DayEntriesModal from '../../components/DayEntriesModal';
+import DayGroupList from '../../components/DayGroupList';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
-import { deleteTransactionRequest, getTransactionsRequest } from '../../services/api';
-import { formatDateTime, formatPeso } from '../../utils/format';
+import {
+  deleteTransactionRequest,
+  getTransactionDaysRequest,
+  getTransactionsRequest,
+} from '../../services/api';
+import { formatDateTime, formatDayKey, formatPeso, localDayBoundsIso } from '../../utils/format';
+
+const collectPages = async (requestPage) => {
+  const first = await requestPage(1);
+  let data = first.data;
+  for (let page = 2; page <= first.totalPages; page += 1) {
+    const next = await requestPage(page);
+    data = data.concat(next.data);
+  }
+  return data;
+};
 
 const TransactionsPage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
   const confirm = useConfirm();
-  const [rows, setRows] = useState([]);
+  const [days, setDays] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [error, setError] = useState('');
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [entries, setEntries] = useState([]);
+  const [dayLoading, setDayLoading] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
-    return getTransactionsRequest(token, paginationModel.page + 1, paginationModel.pageSize)
-      .then((transactions) => {
-        setRows(transactions.data.map((item) => ({ ...item, id: item._id })));
-        setTotal(transactions.total);
+    return getTransactionDaysRequest(token, page + 1, pageSize)
+      .then((result) => {
+        setDays(result.data);
+        setTotal(result.total);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [token, paginationModel]);
+  }, [token, page, pageSize]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadEntries = useCallback(
+    (date) => {
+      setDayLoading(true);
+      const range = localDayBoundsIso(date);
+      return collectPages((pageNumber) => getTransactionsRequest(token, pageNumber, 100, range))
+        .then(setEntries)
+        .catch((err) => setError(err.message))
+        .finally(() => setDayLoading(false));
+    },
+    [token],
+  );
+
+  useEffect(() => {
+    if (selectedDay) loadEntries(selectedDay.date);
+  }, [selectedDay, loadEntries]);
 
   const onDelete = async (id) => {
     const accepted = await confirm({
@@ -47,9 +82,16 @@ const TransactionsPage = () => {
     try {
       await deleteTransactionRequest(id, token);
       notify('Transaction deleted');
-      if (rows.length === 1 && paginationModel.page > 0) {
-        setPaginationModel((model) => ({ ...model, page: model.page - 1 }));
-        return;
+      const remaining = entries.filter((item) => item._id !== id);
+      if (!remaining.length) {
+        setSelectedDay(null);
+        setEntries([]);
+        if (days.length === 1 && page > 0) {
+          setPage((current) => current - 1);
+          return;
+        }
+      } else {
+        setEntries(remaining);
       }
       await load();
     } catch (err) {
@@ -66,52 +108,47 @@ const TransactionsPage = () => {
         </Link>
       </div>
       <ErrorText message={error} />
-      <div className="rounded-lg border border-neutral-200 bg-neutral-0">
-        <PagedGrid
-          rows={rows}
-          rowCount={total}
-          loading={loading}
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          localeText={{ noRowsLabel: 'No income or expenses yet.' }}
-          columns={[
-            { field: 'label', headerName: 'Label', flex: 1, minWidth: 120, sortable: false, filterable: false },
-            { field: 'type', headerName: 'Type', width: 110, sortable: false, filterable: false },
-            {
-              field: 'transactionDate',
-              headerName: 'Date',
-              flex: 1,
-              minWidth: 170,
-              sortable: false,
-              filterable: false,
-              renderCell: ({ row }) => formatDateTime(row.transactionDate),
-            },
-            {
-              field: 'amount',
-              headerName: 'Amount',
-              width: 120,
-              sortable: false,
-              filterable: false,
-              renderCell: ({ row }) => formatPeso(row.amount),
-            },
-            {
-              field: 'actions',
-              headerName: '',
-              width: 210,
-              sortable: false,
-              filterable: false,
-              renderCell: ({ row }) => (
-                <span className="flex items-center gap-2">
-                  <EditLink to={`/transactions/${row.id}/edit`}>Edit</EditLink>
-                  <Button variant="danger" icon={Trash2} onClick={() => onDelete(row.id)}>
+      <DayGroupList
+        days={days}
+        loading={loading}
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        amountLabel="Net"
+        emptyLabel="No income or expenses yet."
+        onOpen={setSelectedDay}
+        onPageChange={(nextPage, nextSize) => {
+          setPage(nextPage);
+          setPageSize(nextSize);
+        }}
+      />
+      {selectedDay && (
+        <DayEntriesModal
+          title={formatDayKey(selectedDay.date)}
+          loading={dayLoading}
+          onClose={() => setSelectedDay(null)}
+        >
+          <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200">
+            {entries.map((item) => (
+              <li key={item._id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                <span>
+                  {item.label}
+                  <span className="ml-2 text-neutral-500">
+                    {item.type} · {formatDateTime(item.transactionDate)}
+                  </span>
+                </span>
+                <span className="flex items-center gap-3">
+                  {formatPeso(item.amount)}
+                  <EditLink to={`/transactions/${item._id}/edit`}>Edit</EditLink>
+                  <Button variant="danger" icon={Trash2} onClick={() => onDelete(item._id)}>
                     Delete
                   </Button>
                 </span>
-              ),
-            },
-          ]}
-        />
-      </div>
+              </li>
+            ))}
+          </ul>
+        </DayEntriesModal>
+      )}
     </section>
   );
 };
