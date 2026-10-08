@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 const dns = require('dns');
 const { MONGO_DB_URL } = require('./config');
 
-dns.setServers(['8.8.8.8', '1.1.1.1']);
+if (process.env.NODE_ENV !== 'production') {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+}
 
 const connectDB = async () => {
   try {
