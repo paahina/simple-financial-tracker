@@ -66,7 +66,7 @@ const CategoriesPage = () => {
         </Link>
       </div>
       <ErrorText message={error} />
-      {!categories && !error && <Loading variant="list" />}
+      {!categories && !error && <Loading variant="cards" />}
       {categories?.length === 0 && <Empty label="No categories yet." />}
       <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {categories?.map((category) => (

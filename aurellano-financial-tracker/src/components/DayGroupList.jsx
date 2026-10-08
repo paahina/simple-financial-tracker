@@ -24,7 +24,7 @@ const DayGroupList = ({
   onSelect,
   emptyLabel,
 }) => {
-  if (loading) return <Loading variant="list" />;
+  if (loading) return <Loading variant="days" />;
   if (!days.length) return <Empty label={emptyLabel} />;
 
   return (

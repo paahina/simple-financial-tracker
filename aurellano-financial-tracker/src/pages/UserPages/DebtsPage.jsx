@@ -68,7 +68,7 @@ const DebtsPage = () => {
       </div>
       <p className="text-sm text-neutral-500">This is money other people owe you. It is separate from the cash in your accounts.</p>
       <ErrorText message={error} />
-      {!debts && !error && <Loading variant="list" />}
+      {!debts && !error && <Loading variant="cards" />}
       {debts?.length === 0 && <Empty label="Nobody owes you money yet." />}
       <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {debts?.map((debt) => (

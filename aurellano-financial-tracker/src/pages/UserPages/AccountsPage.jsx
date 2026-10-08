@@ -67,7 +67,7 @@ const AccountsPage = () => {
         </Link>
       </div>
       <ErrorText message={error} />
-      {!accounts && !error && <Loading variant="list" />}
+      {!accounts && !error && <Loading variant="cards" />}
       {accounts?.length === 0 && <Empty label="No accounts yet." />}
       <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {accounts?.map((account) => (

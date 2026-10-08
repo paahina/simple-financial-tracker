@@ -180,7 +180,7 @@ const ReportsPage = () => {
       )}
       {tab === 'expenses' && (
         <>
-          {!monthly && !error && <Loading variant="reports" />}
+          {!monthly && !error && <Loading variant="reportExpenses" />}
           {monthly && (
             <div className="rounded-lg border border-neutral-200 bg-neutral-0">
               <PagedGrid

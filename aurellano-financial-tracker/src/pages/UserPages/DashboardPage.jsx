@@ -74,7 +74,7 @@ const DashboardPage = () => {
   }, [token, paginationModel]);
 
   if (error && !data) return <ErrorText message={error} />;
-  if (!data) return <Loading variant="dashboard" />;
+  if (!data) return <Loading variant={tab === 'transactions' ? 'dashboardTransactions' : 'dashboard'} />;
 
   const cards = [
     ['Cash on hand', data.totalMoney],

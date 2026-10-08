@@ -164,7 +164,7 @@ const TransfersPage = () => {
               New transfer
             </Link>
           </div>
-          {dayLoading && <Loading variant="list" />}
+          {dayLoading && <Loading variant="entries" />}
           {!dayLoading && selectedDay && entries.length === 0 && <Empty label="No entries on this day." />}
           {!dayLoading && entries.length > 0 && (
             <ul className="space-y-3 lg:space-y-0 lg:divide-y lg:divide-neutral-200 lg:overflow-hidden lg:rounded-lg lg:border lg:border-neutral-200 lg:bg-neutral-0">
