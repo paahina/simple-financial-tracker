@@ -3,7 +3,7 @@ const Category = require('../models/categoryModel');
 const { HttpStatus } = require('../config/constants');
 const { FinanceError, categoryTotals, monthRange, sumAmount, toId, sendFinanceError } =
   require('../utils/finance');
-const { parsePagination, paginatedResponse } = require('../utils/pagination');
+const { parsePagination, paginatedResponse, slicePage } = require('../utils/pagination');
 
 const periodTotals = async (userId, start, end) => {
   const matchBase = {
@@ -69,7 +69,16 @@ const getMonthlyReport = async (req, res) => {
       page,
       limit,
     });
-    res.status(HttpStatus.OK).json({ year, month, ...report, dailyExpenses });
+    res.status(HttpStatus.OK).json({
+      year,
+      month,
+      income: report.income,
+      expenses: report.expenses,
+      net: report.net,
+      incomeByCategory: slicePage(report.incomeByCategory, req.query, 'incomePage', 'incomeLimit'),
+      expensesByCategory: slicePage(report.expensesByCategory, req.query, 'expenseCategoryPage', 'expenseCategoryLimit'),
+      dailyExpenses,
+    });
   } catch (error) {
     sendFinanceError(res, error);
   }

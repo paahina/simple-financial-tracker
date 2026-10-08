@@ -125,11 +125,17 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   assert.equal(debt.status, 201);
   assert.equal(debt.body.debt.status, 'OVERDUE');
 
-  const added = await request(app).put(`/api/debts/update/${debt.body.debt._id}`).set(auth(token)).send({
-    additionalAmount: 10000,
+  const added = await request(app).post('/api/debts/createAddition').set(auth(token)).send({
+    debtId: debt.body.debt._id,
+    label: 'Extra',
+    amount: 10000,
+    createdAt: today,
   });
-  assert.equal(added.status, 200);
-  assert.equal(added.body.originalAmount, 510000);
+  assert.equal(added.status, 201);
+  assert.equal(added.body.originalAmount, 500000);
+  assert.equal(added.body.additions.length, 1);
+  assert.equal(added.body.additions[0].label, 'Extra');
+  assert.equal(added.body.totalAmount, 510000);
   assert.equal(added.body.remainingAmount, 510000);
 
   const payment = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
@@ -198,7 +204,8 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
     .set(auth(token));
   assert.equal(transferDays.status, 200);
   assert.equal(transferDays.body.data[0].count, 1);
-  assert.equal(transferDays.body.data[0].totalAmount, 200000);
+  assert.equal(transferDays.body.data[0].addedAmount, 200000);
+  assert.equal(transferDays.body.data[0].deductedAmount, 200000);
 
   const badZone = await request(app)
     .get('/api/transactions/days?timezone=Not/AZone')

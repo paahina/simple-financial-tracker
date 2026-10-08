@@ -1,5 +1,6 @@
 const Category = require('../models/categoryModel');
 const { HttpStatus } = require('../config/constants');
+const { isPaged, parsePagination, paginatedResponse } = require('../utils/pagination');
 const { FinanceError, sendFinanceError } = require('../utils/finance');
 
 const DEFAULTS = {
@@ -46,8 +47,18 @@ const getAllCategories = async (req, res) => {
     const filter = { userId: req.user.id };
     if (req.query.type) filter.type = req.query.type;
     if (req.query.includeInactive !== 'true') filter.isActive = true;
-    const categories = await Category.find(filter).sort({ type: 1, name: 1 });
-    res.status(HttpStatus.OK).json(categories);
+    const sort = { type: 1, name: 1 };
+    if (!isPaged(req.query)) {
+      const categories = await Category.find(filter).sort(sort);
+      res.status(HttpStatus.OK).json(categories);
+      return;
+    }
+    const { page, limit, skip } = parsePagination(req.query);
+    const [total, categories] = await Promise.all([
+      Category.countDocuments(filter),
+      Category.find(filter).sort(sort).skip(skip).limit(limit),
+    ]);
+    res.status(HttpStatus.OK).json(paginatedResponse({ data: categories, total, page, limit }));
   } catch (error) {
     sendFinanceError(res, error);
   }

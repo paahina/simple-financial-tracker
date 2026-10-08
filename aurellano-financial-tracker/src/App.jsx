@@ -19,7 +19,11 @@ import AccountsPage from './pages/UserPages/AccountsPage';
 import CategoriesPage from './pages/UserPages/CategoriesPage';
 import CategoryFormPage from './pages/UserPages/CategoryFormPage';
 import DashboardPage from './pages/UserPages/DashboardPage';
+import DebtAdditionCreatePage from './pages/UserPages/DebtAdditionCreatePage';
+import DebtAdditionEditPage from './pages/UserPages/DebtAdditionEditPage';
+import DebtCreatePage from './pages/UserPages/DebtCreatePage';
 import DebtDetailPage from './pages/UserPages/DebtDetailPage';
+import DebtPaymentCreatePage from './pages/UserPages/DebtPaymentCreatePage';
 import DebtEditPage from './pages/UserPages/DebtEditPage';
 import DebtsPage from './pages/UserPages/DebtsPage';
 import PaymentEditPage from './pages/UserPages/PaymentEditPage';
@@ -67,6 +71,10 @@ const router = createBrowserRouter([
           { path: '/transfers/new', element: <TransferCreatePage /> },
           { path: '/transfers/:id/edit', element: <TransferEditPage /> },
           { path: '/debts', element: <DebtsPage /> },
+          { path: '/debts/new', element: <DebtCreatePage /> },
+          { path: '/debts/:id/additions/new', element: <DebtAdditionCreatePage /> },
+          { path: '/debts/:id/additions/:additionId/edit', element: <DebtAdditionEditPage /> },
+          { path: '/debts/:id/payments/new', element: <DebtPaymentCreatePage /> },
           { path: '/debts/:id/edit', element: <DebtEditPage /> },
           { path: '/debts/:id/payments/:paymentId/edit', element: <PaymentEditPage /> },
           { path: '/debts/:id', element: <DebtDetailPage /> },

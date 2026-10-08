@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
 import DayGroupList from '../../components/DayGroupList';
 import DayListDrawer from '../../components/DayListDrawer';
+import Pager from '../../components/Pager';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
@@ -15,16 +16,6 @@ import {
   getTransfersRequest,
 } from '../../services/api';
 import { formatDateTime, formatDayKey, formatPeso, localDayBoundsIso } from '../../utils/format';
-
-const collectPages = async (requestPage) => {
-  const first = await requestPage(1);
-  let data = first.data;
-  for (let page = 2; page <= first.totalPages; page += 1) {
-    const next = await requestPage(page);
-    data = data.concat(next.data);
-  }
-  return data;
-};
 
 const TransfersPage = () => {
   const { token } = useAuth();
@@ -39,6 +30,9 @@ const TransfersPage = () => {
   const [error, setError] = useState('');
   const [selectedDay, setSelectedDay] = useState(null);
   const [entries, setEntries] = useState([]);
+  const [entryTotal, setEntryTotal] = useState(0);
+  const [entryPage, setEntryPage] = useState(0);
+  const [entryPageSize, setEntryPageSize] = useState(10);
   const [dayLoading, setDayLoading] = useState(false);
   const [daysOpen, setDaysOpen] = useState(false);
 
@@ -74,13 +68,20 @@ const TransfersPage = () => {
     (date) => {
       setDayLoading(true);
       const range = localDayBoundsIso(date);
-      return collectPages((pageNumber) => getTransfersRequest(token, pageNumber, 100, range))
-        .then(setEntries)
+      return getTransfersRequest(token, entryPage + 1, entryPageSize, range)
+        .then((result) => {
+          setEntries(result.data);
+          setEntryTotal(result.total);
+        })
         .catch((err) => setError(err.message))
         .finally(() => setDayLoading(false));
     },
-    [token],
+    [token, entryPage, entryPageSize],
   );
+
+  useEffect(() => {
+    setEntryPage(0);
+  }, [selectedDay?.date]);
 
   useEffect(() => {
     if (selectedDay) loadEntries(selectedDay.date);
@@ -103,13 +104,17 @@ const TransfersPage = () => {
     try {
       await deleteTransferRequest(transferId, token);
       notify('Transfer deleted');
-      const remaining = entries.filter((item) => item._id !== transferId);
-      if (!remaining.length && days.length === 1 && page > 0) {
+      if (entries.length === 1 && days.length === 1 && page > 0) {
         setEntries([]);
+        setEntryTotal(0);
         setPage((current) => current - 1);
         return;
       }
-      setEntries(remaining);
+      if (entries.length === 1 && entryPage > 0) {
+        setEntryPage((current) => current - 1);
+      } else if (selectedDay) {
+        await loadEntries(selectedDay.date);
+      }
       await load();
     } catch (err) {
       setError(err.message);
@@ -135,7 +140,10 @@ const TransfersPage = () => {
             total={total}
             selectedDate={selectedDay?.date}
             emptyLabel="No transfers yet."
-            onSelect={setSelectedDay}
+            onSelect={(day) => {
+              if (day.date !== selectedDay?.date) setEntryPage(0);
+              setSelectedDay(day);
+            }}
             onPageChange={(nextPage, nextSize) => {
               setPage(nextPage);
               setPageSize(nextSize);
@@ -184,6 +192,16 @@ const TransfersPage = () => {
               ))}
             </ul>
           )}
+          <Pager
+            page={entryPage}
+            pageSize={entryPageSize}
+            total={entryTotal}
+            label="Entries"
+            onPageChange={(nextPage, nextSize) => {
+              setEntryPage(nextPage);
+              setEntryPageSize(nextSize);
+            }}
+          />
         </div>
       </div>
       <DayListDrawer open={daysOpen} onClose={() => setDaysOpen(false)}>
@@ -195,7 +213,10 @@ const TransfersPage = () => {
           total={total}
           selectedDate={selectedDay?.date}
           emptyLabel="No transfers yet."
-          onSelect={setSelectedDay}
+          onSelect={(day) => {
+            if (day.date !== selectedDay?.date) setEntryPage(0);
+            setSelectedDay(day);
+          }}
           onPageChange={(nextPage, nextSize) => {
             setPage(nextPage);
             setPageSize(nextSize);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
@@ -71,7 +72,7 @@ const PaymentEditPage = () => {
         token,
       );
       notify('Payment updated');
-      navigate(`/debts/${id}`);
+      navigate(`/debts/${id}?tab=payments`);
     } catch (err) {
       setError(err.message);
     }
@@ -80,7 +81,7 @@ const PaymentEditPage = () => {
   const dirty = Boolean(form) && JSON.stringify(form) !== baseline;
 
   return (
-    <FormModal dirty={dirty} closeTo={`/debts/${id}`}>
+    <FormModal dirty={dirty} closeTo={`/debts/${id}?tab=payments`}>
       {error && !form && <ErrorText message={error} />}
       {!form && !error && <Loading variant="form" />}
       {form && (
@@ -88,13 +89,11 @@ const PaymentEditPage = () => {
       <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit payment</h1>
       <ErrorText message={error} />
       <Field label="Money goes into" error={fieldErrors.accountId}>
-        <select className={inputClass} required value={form.accountId} onChange={(event) => setForm({ ...form, accountId: event.target.value })}>
-          {accounts.map((account) => (
-            <option key={account._id} value={account._id}>
-              {account.name}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={form.accountId}
+          options={accounts.map((account) => ({ value: account._id, label: account.name }))}
+          onChange={(accountId) => setForm({ ...form, accountId })}
+        />
       </Field>
       <Field label="Amount (PHP)" error={fieldErrors.amount}>
         <input className={inputClass} required type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} />

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
@@ -65,11 +66,15 @@ const AccountCreatePage = () => {
           />
         </Field>
         <Field label="Type">
-          <select className={inputClass} value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>
-            <option value="CASH">Cash</option>
-            <option value="E_WALLET">E-wallet</option>
-            <option value="BANK">Bank</option>
-          </select>
+          <Select
+            value={form.type}
+            options={[
+              { value: 'CASH', label: 'Cash' },
+              { value: 'E_WALLET', label: 'E-wallet' },
+              { value: 'BANK', label: 'Bank' },
+            ]}
+            onChange={(type) => setForm({ ...form, type })}
+          />
         </Field>
         <Field label="Current amount (PHP)" error={fieldErrors.initialBalance}>
           <input

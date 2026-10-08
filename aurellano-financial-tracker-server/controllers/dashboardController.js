@@ -4,8 +4,9 @@ const Transfer = require('../models/transferModel');
 const Debt = require('../models/debtModel');
 const DebtPayment = require('../models/debtPaymentModel');
 const { HttpStatus } = require('../config/constants');
-const { balanceForAccount, debtState, debtTotals, monthRange, sumAmount, sendFinanceError } =
+const { balanceForAccount, debtState, debtTotals, monthRange, owedAmount, sumAmount, sendFinanceError } =
   require('../utils/finance');
+const { slicePage } = require('../utils/pagination');
 
 const getDashboard = async (req, res) => {
   try {
@@ -23,6 +24,7 @@ const getDashboard = async (req, res) => {
       })),
     );
     const totalMoney = accountBalances.reduce((sum, account) => sum + account.balance, 0);
+    const accountPage = slicePage(accountBalances, req.query, 'accountPage', 'accountLimit');
     const [monthlyIncome, monthlyExpenses, debts] = await Promise.all([
       sumAmount(Transaction, {
         userId,
@@ -40,7 +42,7 @@ const getDashboard = async (req, res) => {
     let outstandingReceivables = 0;
     for (const debt of debts) {
       const paid = await debtTotals(DebtPayment, debt._id);
-      const state = debtState(debt.originalAmount, paid, debt.dueDate, now);
+      const state = debtState(owedAmount(debt), paid, debt.dueDate, now);
       outstandingReceivables += state.remaining;
     }
 
@@ -50,7 +52,7 @@ const getDashboard = async (req, res) => {
       monthlyExpenses,
       monthlyNet: monthlyIncome - monthlyExpenses,
       outstandingReceivables,
-      accountBalances,
+      accountBalances: accountPage,
     });
   } catch (error) {
     sendFinanceError(res, error);

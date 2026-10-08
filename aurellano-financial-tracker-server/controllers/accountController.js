@@ -3,6 +3,7 @@ const Transaction = require('../models/transactionModel');
 const Transfer = require('../models/transferModel');
 const DebtPayment = require('../models/debtPaymentModel');
 const { HttpStatus } = require('../config/constants');
+const { isPaged, parsePagination, paginatedResponse } = require('../utils/pagination');
 const {
   balanceForAccount,
   requireOwnedAccount,
@@ -19,9 +20,20 @@ const withBalance = async (account) => {
 
 const getAllAccounts = async (req, res) => {
   try {
-    const accounts = await Account.find({ userId: req.user.id }).sort({ name: 1 });
-    const withBalances = await Promise.all(accounts.map(withBalance));
-    res.status(HttpStatus.OK).json(withBalances);
+    const filter = { userId: req.user.id };
+    if (!isPaged(req.query)) {
+      const accounts = await Account.find(filter).sort({ name: 1 });
+      const withBalances = await Promise.all(accounts.map(withBalance));
+      res.status(HttpStatus.OK).json(withBalances);
+      return;
+    }
+    const { page, limit, skip } = parsePagination(req.query);
+    const [total, accounts] = await Promise.all([
+      Account.countDocuments(filter),
+      Account.find(filter).sort({ name: 1 }).skip(skip).limit(limit),
+    ]);
+    const data = await Promise.all(accounts.map(withBalance));
+    res.status(HttpStatus.OK).json(paginatedResponse({ data, total, page, limit }));
   } catch (error) {
     sendFinanceError(res, error);
   }

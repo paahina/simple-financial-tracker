@@ -44,9 +44,11 @@ export const logoutRequest = (token) =>
 
 export const sessionRequest = (token) => apiRequest('/api/users/session', { token });
 
-export const getDashboardRequest = (token) => apiRequest('/api/dashboard/get', { token });
+export const getDashboardRequest = (token, accountPage = 1, accountLimit = 10) =>
+  apiRequest(`/api/dashboard/get${toQuery({ accountPage, accountLimit })}`, { token });
 
-export const getAccountsRequest = (token) => apiRequest('/api/accounts/getAllAccounts', { token });
+export const getAccountsRequest = (token, { page, limit } = {}) =>
+  apiRequest(`/api/accounts/getAllAccounts${toQuery({ page, limit })}`, { token });
 
 export const getAccountRequest = (id, token) => apiRequest(`/api/accounts/get/${id}`, { token });
 
@@ -59,13 +61,16 @@ export const updateAccountRequest = (id, payload, token) =>
 export const deactivateAccountRequest = (id, token) =>
   apiRequest(`/api/accounts/delete/${id}`, { method: 'DELETE', token });
 
-export const getCategoriesRequest = (token, { type, includeInactive } = {}) => {
-  const params = new URLSearchParams();
-  if (type) params.set('type', type);
-  if (includeInactive) params.set('includeInactive', 'true');
-  const query = params.toString();
-  return apiRequest(`/api/categories/getAllCategories${query ? `?${query}` : ''}`, { token });
-};
+export const getCategoriesRequest = (token, { type, includeInactive, page, limit } = {}) =>
+  apiRequest(
+    `/api/categories/getAllCategories${toQuery({
+      type,
+      includeInactive: includeInactive ? 'true' : undefined,
+      page,
+      limit,
+    })}`,
+    { token },
+  );
 
 export const getCategoryRequest = (id, token) => apiRequest(`/api/categories/get/${id}`, { token });
 
@@ -116,9 +121,11 @@ export const updateTransferRequest = (id, payload, token) =>
 export const deleteTransferRequest = (id, token) =>
   apiRequest(`/api/transfers/delete/${id}`, { method: 'DELETE', token });
 
-export const getDebtsRequest = (token) => apiRequest('/api/debts/getAllDebts', { token });
+export const getDebtsRequest = (token, { page, limit } = {}) =>
+  apiRequest(`/api/debts/getAllDebts${toQuery({ page, limit })}`, { token });
 
-export const getDebtRequest = (id, token) => apiRequest(`/api/debts/get/${id}`, { token });
+export const getDebtRequest = (id, token, paging = {}) =>
+  apiRequest(`/api/debts/get/${id}${toQuery(paging)}`, { token });
 
 export const createDebtRequest = (payload, token) =>
   apiRequest('/api/debts/create', { method: 'POST', body: payload, token });
@@ -129,6 +136,15 @@ export const updateDebtRequest = (id, payload, token) =>
 export const deleteDebtRequest = (id, token) =>
   apiRequest(`/api/debts/delete/${id}`, { method: 'DELETE', token });
 
+export const createDebtAdditionRequest = (payload, token) =>
+  apiRequest('/api/debts/createAddition', { method: 'POST', body: payload, token });
+
+export const updateDebtAdditionRequest = (id, payload, token) =>
+  apiRequest(`/api/debts/updateAddition/${id}`, { method: 'PUT', body: payload, token });
+
+export const deleteDebtAdditionRequest = (id, token) =>
+  apiRequest(`/api/debts/deleteAddition/${id}`, { method: 'DELETE', token });
+
 export const createDebtPaymentRequest = (payload, token) =>
   apiRequest('/api/debts/createPayment', { method: 'POST', body: payload, token });
 
@@ -138,8 +154,20 @@ export const updateDebtPaymentRequest = (id, payload, token) =>
 export const deleteDebtPaymentRequest = (id, token) =>
   apiRequest(`/api/debts/deletePayment/${id}`, { method: 'DELETE', token });
 
-export const getMonthlyReportRequest = (token, year, month, page = 1, limit = 10) =>
-  apiRequest(`/api/reports/monthly?year=${year}&month=${month}&page=${page}&limit=${limit}`, { token });
+export const getMonthlyReportRequest = (token, year, month, page = 1, limit = 10, categories = {}) =>
+  apiRequest(
+    `/api/reports/monthly${toQuery({
+      year,
+      month,
+      page,
+      limit,
+      incomePage: categories.incomePage,
+      incomeLimit: categories.incomeLimit,
+      expenseCategoryPage: categories.expenseCategoryPage,
+      expenseCategoryLimit: categories.expenseCategoryLimit,
+    })}`,
+    { token },
+  );
 
 export const getYearlyReportRequest = (token, year) =>
   apiRequest(`/api/reports/yearly?year=${year}`, { token });

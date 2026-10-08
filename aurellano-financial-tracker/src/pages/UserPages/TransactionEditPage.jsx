@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
@@ -99,29 +100,28 @@ const TransactionEditPage = () => {
       <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit transaction</h1>
       <ErrorText message={error} />
       <Field label="Account" error={fieldErrors.accountId}>
-        <select className={inputClass} required value={form.accountId} onChange={(event) => setForm({ ...form, accountId: event.target.value })}>
-          {accounts.map((account) => (
-            <option key={account._id} value={account._id}>
-              {account.name}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={form.accountId}
+          options={accounts.map((account) => ({ value: account._id, label: account.name }))}
+          onChange={(accountId) => setForm({ ...form, accountId })}
+        />
       </Field>
       <Field label="Type">
-        <select className={inputClass} value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value, categoryId: '' })}>
-          <option value="EXPENSE">Expense</option>
-          <option value="INCOME">Income</option>
-        </select>
+        <Select
+          value={form.type}
+          options={[
+            { value: 'EXPENSE', label: 'Expense' },
+            { value: 'INCOME', label: 'Income' },
+          ]}
+          onChange={(type) => setForm({ ...form, type, categoryId: '' })}
+        />
       </Field>
       <Field label="Category" error={fieldErrors.categoryId}>
-        <select className={inputClass} required value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
-          <option value="">Select</option>
-          {matchingCategories.map((category) => (
-            <option key={category._id} value={category._id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={form.categoryId}
+          options={matchingCategories.map((category) => ({ value: category._id, label: category.name }))}
+          onChange={(categoryId) => setForm({ ...form, categoryId })}
+        />
       </Field>
       <Field label="Label" error={fieldErrors.label}>
         <input className={inputClass} required value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} />

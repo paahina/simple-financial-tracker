@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button, { editLinkClass } from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import Select from '../../components/Select';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -126,20 +127,14 @@ const TransferCreatePage = () => {
               <article key={row.key} className="min-w-full shrink-0 snap-start space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
                 <p className="text-sm font-medium text-primary-shade">Entry {index + 1}</p>
                 <Field label="From" error={errors.fromAccountId}>
-                  <select
-                    className={inputClass}
-                    required
+                  <Select
                     value={row.fromAccountId}
-                    onChange={(event) => updateDraft(row.key, { fromAccountId: event.target.value })}
-                  >
-                    <option value="">Select</option>
-                    {activeAccounts.map((account) => (
-                      <option key={account._id} value={account._id}>
-                        {account.name}
-                      </option>
-                    ))}
-                    <option value="other">From other</option>
-                  </select>
+                    options={[
+                      ...activeAccounts.map((account) => ({ value: account._id, label: account.name })),
+                      { value: 'other', label: 'From other' },
+                    ]}
+                    onChange={(fromAccountId) => updateDraft(row.key, { fromAccountId })}
+                  />
                 </Field>
                 {row.fromAccountId === 'other' ? (
                   <Field label="Sender" error={errors.senderName}>
@@ -153,20 +148,14 @@ const TransferCreatePage = () => {
                   </Field>
                 ) : null}
                 <Field label="To" error={errors.toAccountId}>
-                  <select
-                    className={inputClass}
-                    required
+                  <Select
                     value={row.toAccountId}
-                    onChange={(event) => updateDraft(row.key, { toAccountId: event.target.value })}
-                  >
-                    <option value="">Select</option>
-                    {activeAccounts.map((account) => (
-                      <option key={account._id} value={account._id}>
-                        {account.name}
-                      </option>
-                    ))}
-                    <option value="other">To other</option>
-                  </select>
+                    options={[
+                      ...activeAccounts.map((account) => ({ value: account._id, label: account.name })),
+                      { value: 'other', label: 'To other' },
+                    ]}
+                    onChange={(toAccountId) => updateDraft(row.key, { toAccountId })}
+                  />
                 </Field>
                 {row.toAccountId === 'other' ? (
                   <Field label="Recipient" error={errors.recipientName}>
@@ -215,20 +204,14 @@ const TransferCreatePage = () => {
                 return (
                   <tr key={row.key} className="border-b border-neutral-200 align-top">
                     <td className="space-y-2 px-2 py-2">
-                      <select
-                        className={inputClass}
-                        required
+                      <Select
                         value={row.fromAccountId}
-                        onChange={(event) => updateDraft(row.key, { fromAccountId: event.target.value })}
-                      >
-                        <option value="">Select</option>
-                        {activeAccounts.map((account) => (
-                          <option key={account._id} value={account._id}>
-                            {account.name}
-                          </option>
-                        ))}
-                        <option value="other">From other</option>
-                      </select>
+                        options={[
+                          ...activeAccounts.map((account) => ({ value: account._id, label: account.name })),
+                          { value: 'other', label: 'From other' },
+                        ]}
+                        onChange={(fromAccountId) => updateDraft(row.key, { fromAccountId })}
+                      />
                       {errors.fromAccountId ? (
                         <p className="text-xs text-error-foreground">{errors.fromAccountId}</p>
                       ) : null}
@@ -249,20 +232,14 @@ const TransferCreatePage = () => {
                       ) : null}
                     </td>
                     <td className="space-y-2 px-2 py-2">
-                      <select
-                        className={inputClass}
-                        required
+                      <Select
                         value={row.toAccountId}
-                        onChange={(event) => updateDraft(row.key, { toAccountId: event.target.value })}
-                      >
-                        <option value="">Select</option>
-                        {activeAccounts.map((account) => (
-                          <option key={account._id} value={account._id}>
-                            {account.name}
-                          </option>
-                        ))}
-                        <option value="other">To other</option>
-                      </select>
+                        options={[
+                          ...activeAccounts.map((account) => ({ value: account._id, label: account.name })),
+                          { value: 'other', label: 'To other' },
+                        ]}
+                        onChange={(toAccountId) => updateDraft(row.key, { toAccountId })}
+                      />
                       {errors.toAccountId ? <p className="text-xs text-error-foreground">{errors.toAccountId}</p> : null}
                       {row.toAccountId === 'other' ? (
                         <>

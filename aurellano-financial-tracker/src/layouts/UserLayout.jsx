@@ -13,7 +13,15 @@ const backgroundFor = (pathname, state) => {
   if (matchPath('/categories/new', pathname) || matchPath('/categories/:id/edit', pathname)) return CategoriesPage;
   if (matchPath('/transactions/:id/edit', pathname)) return TransactionsPage;
   if (matchPath('/transfers/:id/edit', pathname)) return TransfersPage;
-  if (matchPath('/debts/:id/payments/:paymentId/edit', pathname)) return DebtDetailPage;
+  if (matchPath('/debts/new', pathname)) return DebtsPage;
+  if (
+    matchPath('/debts/:id/additions/new', pathname) ||
+    matchPath('/debts/:id/additions/:additionId/edit', pathname) ||
+    matchPath('/debts/:id/payments/new', pathname) ||
+    matchPath('/debts/:id/payments/:paymentId/edit', pathname)
+  ) {
+    return DebtDetailPage;
+  }
   if (matchPath('/debts/:id/edit', pathname)) {
     if (matchPath({ path: '/debts/:id', end: true }, from)) return DebtDetailPage;
     return DebtsPage;

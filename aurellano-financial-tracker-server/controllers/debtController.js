@@ -2,23 +2,27 @@ const Debt = require('../models/debtModel');
 const DebtPayment = require('../models/debtPaymentModel');
 const Account = require('../models/accountModel');
 const { HttpStatus } = require('../config/constants');
+const { isPaged, parsePagination, paginatedResponse, slicePage } = require('../utils/pagination');
 const {
   FinanceError,
   debtState,
   debtTotals,
+  owedAmount,
   requireOwnedAccount,
   sendFinanceError,
 } = require('../utils/finance');
 
 const presentDebt = async (debt) => {
   const paid = await debtTotals(DebtPayment, debt._id);
-  const state = debtState(debt.originalAmount, paid, debt.dueDate);
+  const total = owedAmount(debt);
+  const state = debtState(total, paid, debt.dueDate);
   if (debt.status !== state.status) {
     debt.status = state.status;
     await debt.save();
   }
   const plain = debt.toObject();
   plain.paidAmount = paid;
+  plain.totalAmount = total;
   plain.remainingAmount = state.remaining;
   plain.status = state.status;
   return plain;
@@ -36,12 +40,31 @@ const refreshStatus = async (debt) => presentDebt(debt);
 
 const getAllDebts = async (req, res) => {
   try {
-    const debts = await Debt.find({ userId: req.user.id }).sort({ dueDate: 1 });
-    const presented = await Promise.all(debts.map(presentDebt));
-    const filtered = req.query.status
-      ? presented.filter((debt) => debt.status === req.query.status)
-      : presented;
-    res.status(HttpStatus.OK).json(filtered);
+    const filter = { userId: req.user.id };
+    const sort = { dueDate: 1 };
+    if (!isPaged(req.query)) {
+      const debts = await Debt.find(filter).sort(sort);
+      const presented = await Promise.all(debts.map(presentDebt));
+      const filtered = req.query.status
+        ? presented.filter((debt) => debt.status === req.query.status)
+        : presented;
+      res.status(HttpStatus.OK).json(filtered);
+      return;
+    }
+    const { page, limit, skip } = parsePagination(req.query);
+    if (req.query.status) {
+      const debts = await Debt.find(filter).sort(sort);
+      const presented = await Promise.all(debts.map(presentDebt));
+      const filtered = presented.filter((debt) => debt.status === req.query.status);
+      res.status(HttpStatus.OK).json(slicePage(filtered, req.query));
+      return;
+    }
+    const [total, debts] = await Promise.all([
+      Debt.countDocuments(filter),
+      Debt.find(filter).sort(sort).skip(skip).limit(limit),
+    ]);
+    const data = await Promise.all(debts.map(presentDebt));
+    res.status(HttpStatus.OK).json(paginatedResponse({ data, total, page, limit }));
   } catch (error) {
     sendFinanceError(res, error);
   }
@@ -53,7 +76,16 @@ const getDebtById = async (req, res) => {
     const payments = await DebtPayment.find({ debtId: debt._id, userId: req.user.id }).sort({
       paymentDate: -1,
     });
-    res.status(HttpStatus.OK).json({ debt: await presentDebt(debt), payments });
+    const presented = await presentDebt(debt);
+    if (req.query.additionsPage || req.query.paymentsPage) {
+      res.status(HttpStatus.OK).json({
+        debt: presented,
+        additions: slicePage(presented.additions || [], req.query, 'additionsPage', 'additionsLimit'),
+        payments: slicePage(payments, req.query, 'paymentsPage', 'paymentsLimit'),
+      });
+      return;
+    }
+    res.status(HttpStatus.OK).json({ debt: presented, payments });
   } catch (error) {
     sendFinanceError(res, error);
   }
@@ -87,15 +119,69 @@ const updateDebt = async (req, res) => {
       debt.dueDate = req.body.dueDate ? new Date(req.body.dueDate) : null;
     }
     if (req.body.originalAmount !== undefined) {
-      const paid = await debtTotals(DebtPayment, debt._id);
-      if (Number(req.body.originalAmount) < paid) {
-        throw new FinanceError('Original amount cannot be less than recorded payments');
-      }
       debt.originalAmount = Number(req.body.originalAmount);
     }
-    if (req.body.additionalAmount !== undefined) {
-      debt.originalAmount += Number(req.body.additionalAmount);
+    const paid = await debtTotals(DebtPayment, debt._id);
+    if (owedAmount(debt) < paid) {
+      throw new FinanceError('Amount owed cannot be less than recorded payments');
     }
+    await debt.save();
+    res.status(HttpStatus.OK).json(await presentDebt(debt));
+  } catch (error) {
+    sendFinanceError(res, error);
+  }
+};
+
+const requireAddition = async (userId, additionId) => {
+  const debt = await Debt.findOne({ userId, 'additions._id': additionId });
+  if (!debt) {
+    throw new FinanceError('Added amount not found', HttpStatus.NOT_FOUND);
+  }
+  return { debt, line: debt.additions.id(additionId) };
+};
+
+const assertOwedCoversPayments = async (debt) => {
+  const paid = await debtTotals(DebtPayment, debt._id);
+  if (owedAmount(debt) < paid) {
+    throw new FinanceError('Amount owed cannot be less than recorded payments');
+  }
+};
+
+const createAddition = async (req, res) => {
+  try {
+    const debt = await requireDebt(req.user.id, req.body.debtId);
+    debt.additions.push({
+      label: String(req.body.label).trim(),
+      amount: Number(req.body.amount),
+      createdAt: new Date(req.body.createdAt),
+    });
+    await assertOwedCoversPayments(debt);
+    await debt.save();
+    res.status(HttpStatus.CREATED).json(await presentDebt(debt));
+  } catch (error) {
+    sendFinanceError(res, error);
+  }
+};
+
+const updateAddition = async (req, res) => {
+  try {
+    const { debt, line } = await requireAddition(req.user.id, req.params.id);
+    if (req.body.label !== undefined) line.label = String(req.body.label).trim();
+    if (req.body.amount !== undefined) line.amount = Number(req.body.amount);
+    if (req.body.createdAt !== undefined) line.createdAt = new Date(req.body.createdAt);
+    await assertOwedCoversPayments(debt);
+    await debt.save();
+    res.status(HttpStatus.OK).json(await presentDebt(debt));
+  } catch (error) {
+    sendFinanceError(res, error);
+  }
+};
+
+const deleteAddition = async (req, res) => {
+  try {
+    const { debt, line } = await requireAddition(req.user.id, req.params.id);
+    line.deleteOne();
+    await assertOwedCoversPayments(debt);
     await debt.save();
     res.status(HttpStatus.OK).json(await presentDebt(debt));
   } catch (error) {
@@ -135,7 +221,7 @@ const createDebtPayment = async (req, res) => {
     const debt = await requireDebt(req.user.id, req.body.debtId);
     await requireOwnedAccount(Account, req.user.id, req.body.accountId, { active: true });
     const paid = await debtTotals(DebtPayment, debt._id);
-    const remaining = debt.originalAmount - paid;
+    const remaining = owedAmount(debt) - paid;
     const amount = Number(req.body.amount);
     if (amount > remaining) {
       throw new FinanceError('Payment cannot be greater than the remaining debt');
@@ -169,7 +255,7 @@ const updateDebtPayment = async (req, res) => {
     await requireOwnedAccount(Account, req.user.id, nextAccountId, { active: true });
     const paid = await debtTotals(DebtPayment, debt._id);
     const nextAmount = req.body.amount !== undefined ? Number(req.body.amount) : payment.amount;
-    const remainingWithoutThis = debt.originalAmount - (paid - payment.amount);
+    const remainingWithoutThis = owedAmount(debt) - (paid - payment.amount);
     if (nextAmount > remainingWithoutThis) {
       throw new FinanceError('Payment cannot be greater than the remaining debt');
     }
@@ -208,6 +294,9 @@ module.exports = {
   getDebtById,
   createDebt,
   updateDebt,
+  createAddition,
+  updateAddition,
+  deleteAddition,
   deleteDebt,
   getDebtPayments,
   createDebtPayment,

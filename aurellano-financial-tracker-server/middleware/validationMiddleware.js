@@ -149,8 +149,22 @@ const debtUpdateValidation = [
   body('personName').optional().isString().trim().isLength({ min: 2, max: 100 }),
   body('description').optional().isString().trim(),
   body('originalAmount').optional().isInt({ min: 1 }),
-  body('additionalAmount').optional().isInt({ min: 1 }),
   body('dueDate').optional({ values: 'falsy' }).isISO8601(),
+  handleValidation,
+];
+
+const debtAdditionValidation = [
+  body('debtId').isMongoId(),
+  body('label').isString().trim().isLength({ min: 1, max: 100 }),
+  body('amount').isInt({ min: 1 }),
+  body('createdAt').isISO8601(),
+  handleValidation,
+];
+
+const debtAdditionUpdateValidation = [
+  body('label').optional().isString().trim().isLength({ min: 1, max: 100 }),
+  body('amount').optional().isInt({ min: 1 }),
+  body('createdAt').optional().isISO8601(),
   handleValidation,
 ];
 
@@ -192,6 +206,8 @@ module.exports = {
   transferUpdateValidation,
   debtValidation,
   debtUpdateValidation,
+  debtAdditionValidation,
+  debtAdditionUpdateValidation,
   debtPaymentValidation,
   debtPaymentUpdateValidation,
   reportQueryValidation,

@@ -12,4 +12,19 @@ const paginatedResponse = ({ data, total, page, limit }) => ({
   totalPages: Math.ceil(total / limit) || 0,
 });
 
-module.exports = { parsePagination, paginatedResponse };
+const isPaged = (query) => query.page !== undefined && query.page !== '';
+
+const slicePage = (items, query, pageKey = 'page', limitKey = 'limit') => {
+  const { page, limit, skip } = parsePagination({
+    page: query[pageKey],
+    limit: query[limitKey],
+  });
+  return paginatedResponse({
+    data: items.slice(skip, skip + limit),
+    total: items.length,
+    page,
+    limit,
+  });
+};
+
+module.exports = { parsePagination, paginatedResponse, isPaged, slicePage };

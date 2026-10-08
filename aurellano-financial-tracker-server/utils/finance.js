@@ -84,6 +84,10 @@ const balanceForAccount = async (account, models) => {
 const debtTotals = async (DebtPayment, debtId) =>
   sumAmount(DebtPayment, { debtId });
 
+const owedAmount = (debt) =>
+  Number(debt.originalAmount) +
+  (debt.additions || []).reduce((sum, line) => sum + Number(line.amount), 0);
+
 const debtState = (originalAmount, paidAmount, dueDate, now = new Date()) => {
   const remaining = Math.max(originalAmount - paidAmount, 0);
   let status = 'PENDING';
@@ -127,6 +131,7 @@ module.exports = {
   balanceForAccount,
   debtTotals,
   debtState,
+  owedAmount,
   categoryTotals,
   sendFinanceError,
 };

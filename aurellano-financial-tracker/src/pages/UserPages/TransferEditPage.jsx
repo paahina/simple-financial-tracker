@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
@@ -94,14 +95,14 @@ const TransferEditPage = () => {
       <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit transfer</h1>
       <ErrorText message={error} />
       <Field label="From" error={fieldErrors.fromAccountId}>
-        <select className={inputClass} required value={form.fromAccountId} onChange={(event) => setForm({ ...form, fromAccountId: event.target.value })}>
-          {accounts.map((account) => (
-            <option key={account._id} value={account._id}>
-              {account.name}
-            </option>
-          ))}
-          <option value="other">From other</option>
-        </select>
+        <Select
+          value={form.fromAccountId}
+          options={[
+            ...accounts.map((account) => ({ value: account._id, label: account.name })),
+            { value: 'other', label: 'From other' },
+          ]}
+          onChange={(fromAccountId) => setForm({ ...form, fromAccountId })}
+        />
       </Field>
       {form.fromAccountId === 'other' && (
         <Field label="Sender" error={fieldErrors.senderName}>
@@ -115,14 +116,14 @@ const TransferEditPage = () => {
         </Field>
       )}
       <Field label="To" error={fieldErrors.toAccountId}>
-        <select className={inputClass} required value={form.toAccountId} onChange={(event) => setForm({ ...form, toAccountId: event.target.value })}>
-          {accounts.map((account) => (
-            <option key={account._id} value={account._id}>
-              {account.name}
-            </option>
-          ))}
-          <option value="other">To other</option>
-        </select>
+        <Select
+          value={form.toAccountId}
+          options={[
+            ...accounts.map((account) => ({ value: account._id, label: account.name })),
+            { value: 'other', label: 'To other' },
+          ]}
+          onChange={(toAccountId) => setForm({ ...form, toAccountId })}
+        />
       </Field>
       {form.toAccountId === 'other' && (
         <Field label="Recipient" error={fieldErrors.recipientName}>

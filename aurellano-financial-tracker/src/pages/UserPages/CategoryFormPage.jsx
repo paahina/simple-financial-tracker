@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
@@ -73,10 +74,15 @@ const CategoryFormPage = () => {
         <input className={inputClass} required minLength={2} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
       </Field>
       <Field label="Type">
-        <select className={inputClass} value={form.type} disabled={editing} onChange={(event) => setForm({ ...form, type: event.target.value })}>
-          <option value="EXPENSE">Expense</option>
-          <option value="INCOME">Income</option>
-        </select>
+        <Select
+          value={form.type}
+          disabled={editing}
+          options={[
+            { value: 'EXPENSE', label: 'Expense' },
+            { value: 'INCOME', label: 'Income' },
+          ]}
+          onChange={(type) => setForm({ ...form, type })}
+        />
       </Field>
       {editing && (
         <label className="flex items-center gap-2 text-sm">

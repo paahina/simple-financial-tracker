@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
 import Money from '../../components/Money';
+import Pager from '../../components/Pager';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
@@ -15,14 +16,20 @@ const AccountsPage = () => {
   const { notify } = useToast();
   const confirm = useConfirm();
   const [accounts, setAccounts] = useState(null);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [error, setError] = useState('');
 
   const load = useCallback(
     () =>
-      getAccountsRequest(token)
-        .then(setAccounts)
+      getAccountsRequest(token, { page: page + 1, limit: pageSize })
+        .then((result) => {
+          setAccounts(result.data);
+          setTotal(result.total);
+        })
         .catch((err) => setError(err.message)),
-    [token],
+    [token, page, pageSize],
   );
 
   useEffect(() => {
@@ -41,6 +48,10 @@ const AccountsPage = () => {
     try {
       await deactivateAccountRequest(id, token);
       notify('Account deactivated');
+      if (accounts.length === 1 && page > 0) {
+        setPage((current) => current - 1);
+        return;
+      }
       await load();
     } catch (err) {
       setError(err.message);
@@ -80,6 +91,16 @@ const AccountsPage = () => {
           </li>
         ))}
       </ul>
+      <Pager
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        label="Accounts"
+        onPageChange={(nextPage, nextSize) => {
+          setPage(nextPage);
+          setPageSize(nextSize);
+        }}
+      />
     </section>
   );
 };

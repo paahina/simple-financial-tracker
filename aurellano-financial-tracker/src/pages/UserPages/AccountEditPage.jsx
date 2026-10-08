@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
@@ -83,11 +84,15 @@ const AccountEditPage = () => {
         <input className={inputClass} required minLength={2} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
       </Field>
       <Field label="Type">
-        <select className={inputClass} value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>
-          <option value="CASH">Cash</option>
-          <option value="E_WALLET">E-wallet</option>
-          <option value="BANK">Bank</option>
-        </select>
+        <Select
+          value={form.type}
+          options={[
+            { value: 'CASH', label: 'Cash' },
+            { value: 'E_WALLET', label: 'E-wallet' },
+            { value: 'BANK', label: 'Bank' },
+          ]}
+          onChange={(type) => setForm({ ...form, type })}
+        />
       </Field>
       <Field label="Current amount (PHP)" error={fieldErrors.currentAmount}>
         <input className={inputClass} type="number" min="0" step="0.01" value={form.currentAmount} onChange={(event) => setForm({ ...form, currentAmount: event.target.value })} />

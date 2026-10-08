@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button, { editLinkClass } from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import Select from '../../components/Select';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -128,44 +129,28 @@ const TransactionCreatePage = () => {
               <article key={row.key} className="min-w-full shrink-0 snap-start space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
                 <p className="text-sm font-medium text-primary-shade">Entry {index + 1}</p>
                 <Field label="Account" error={errors.accountId}>
-                  <select
-                    className={inputClass}
-                    required
+                  <Select
                     value={row.accountId}
-                    onChange={(event) => updateDraft(row.key, { accountId: event.target.value })}
-                  >
-                    <option value="">Select</option>
-                    {accounts.map((account) => (
-                      <option key={account._id} value={account._id}>
-                        {account.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={accounts.map((account) => ({ value: account._id, label: account.name }))}
+                    onChange={(accountId) => updateDraft(row.key, { accountId })}
+                  />
                 </Field>
                 <Field label="Type">
-                  <select
-                    className={inputClass}
+                  <Select
                     value={row.type}
-                    onChange={(event) => updateDraft(row.key, { type: event.target.value, categoryId: '' })}
-                  >
-                    <option value="EXPENSE">Expense</option>
-                    <option value="INCOME">Income</option>
-                  </select>
+                    options={[
+                      { value: 'EXPENSE', label: 'Expense' },
+                      { value: 'INCOME', label: 'Income' },
+                    ]}
+                    onChange={(type) => updateDraft(row.key, { type, categoryId: '' })}
+                  />
                 </Field>
                 <Field label="Category" error={errors.categoryId}>
-                  <select
-                    className={inputClass}
-                    required
+                  <Select
                     value={row.categoryId}
-                    onChange={(event) => updateDraft(row.key, { categoryId: event.target.value })}
-                  >
-                    <option value="">Select</option>
-                    {matchingCategories.map((category) => (
-                      <option key={category._id} value={category._id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={matchingCategories.map((category) => ({ value: category._id, label: category.name }))}
+                    onChange={(categoryId) => updateDraft(row.key, { categoryId })}
+                  />
                 </Field>
                 <Field label="Label" error={errors.label}>
                   <input
@@ -214,45 +199,29 @@ const TransactionCreatePage = () => {
                 return (
                   <tr key={row.key} className="border-b border-neutral-200 align-top">
                     <td className="px-2 py-2">
-                      <select
-                        className={inputClass}
-                        required
+                      <Select
                         value={row.accountId}
-                        onChange={(event) => updateDraft(row.key, { accountId: event.target.value })}
-                      >
-                        <option value="">Select</option>
-                        {accounts.map((account) => (
-                          <option key={account._id} value={account._id}>
-                            {account.name}
-                          </option>
-                        ))}
-                      </select>
+                        options={accounts.map((account) => ({ value: account._id, label: account.name }))}
+                        onChange={(accountId) => updateDraft(row.key, { accountId })}
+                      />
                       {errors.accountId ? <p className="mt-1 text-xs text-error-foreground">{errors.accountId}</p> : null}
                     </td>
                     <td className="px-2 py-2">
-                      <select
-                        className={inputClass}
+                      <Select
                         value={row.type}
-                        onChange={(event) => updateDraft(row.key, { type: event.target.value, categoryId: '' })}
-                      >
-                        <option value="EXPENSE">Expense</option>
-                        <option value="INCOME">Income</option>
-                      </select>
+                        options={[
+                          { value: 'EXPENSE', label: 'Expense' },
+                          { value: 'INCOME', label: 'Income' },
+                        ]}
+                        onChange={(type) => updateDraft(row.key, { type, categoryId: '' })}
+                      />
                     </td>
                     <td className="px-2 py-2">
-                      <select
-                        className={inputClass}
-                        required
+                      <Select
                         value={row.categoryId}
-                        onChange={(event) => updateDraft(row.key, { categoryId: event.target.value })}
-                      >
-                        <option value="">Select</option>
-                        {matchingCategories.map((category) => (
-                          <option key={category._id} value={category._id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
+                        options={matchingCategories.map((category) => ({ value: category._id, label: category.name }))}
+                        onChange={(categoryId) => updateDraft(row.key, { categoryId })}
+                      />
                       {errors.categoryId ? <p className="mt-1 text-xs text-error-foreground">{errors.categoryId}</p> : null}
                     </td>
                     <td className="px-2 py-2">

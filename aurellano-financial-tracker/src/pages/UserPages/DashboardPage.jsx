@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Money from '../../components/Money';
+import Tabs from '../../components/Tabs';
 import PagedGrid from '../../components/PagedGrid';
+import Pager from '../../components/Pager';
 import { Loading } from '../../components/Skeleton';
 import { Empty, ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
@@ -31,6 +34,8 @@ const transactionColumns = [
 
 const DashboardPage = () => {
   const { token } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') === 'transactions' ? 'transactions' : 'summary';
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [transactions, setTransactions] = useState([]);
@@ -38,12 +43,14 @@ const DashboardPage = () => {
   const [transactionError, setTransactionError] = useState('');
   const [gridLoading, setGridLoading] = useState(true);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [accountPage, setAccountPage] = useState(0);
+  const [accountPageSize, setAccountPageSize] = useState(10);
 
   useEffect(() => {
-    getDashboardRequest(token)
+    getDashboardRequest(token, accountPage + 1, accountPageSize)
       .then(setData)
       .catch((err) => setError(err.message));
-  }, [token]);
+  }, [token, accountPage, accountPageSize]);
 
   useEffect(() => {
     let active = true;
@@ -80,45 +87,70 @@ const DashboardPage = () => {
   return (
     <section className="space-y-6">
       <h1 className="text-2xl font-semibold text-primary-shade">Dashboard</h1>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map(([label, amount]) => (
-          <article key={label} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4">
-            <p className="text-sm text-neutral-500">{label}</p>
-            <Money className="mt-2 block text-xl font-semibold text-primary-shade" centavos={amount} />
-          </article>
-        ))}
-      </div>
-      <div>
-        <h2 className="mb-3 text-lg text-primary">Accounts</h2>
-        {data.accountBalances.length === 0 ? (
-          <Empty label="No active accounts yet. Add one from Accounts." />
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {data.accountBalances.map((account) => (
-              <article key={account.id} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4">
-                <p className="font-medium">{account.name}</p>
-                <p className="text-sm text-neutral-500">{account.type}</p>
-                <Money className="mt-2 block text-primary-shade" centavos={account.balance} />
+      <Tabs
+        value={tab}
+        tabs={[
+          { id: 'summary', label: 'Summary' },
+          { id: 'transactions', label: 'Recent transactions' },
+        ]}
+        onChange={(id) => setSearchParams(id === 'transactions' ? { tab: 'transactions' } : {})}
+      />
+      {tab === 'summary' && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {cards.map(([label, amount]) => (
+              <article key={label} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4">
+                <p className="text-sm text-neutral-500">{label}</p>
+                <Money className="mt-2 block text-xl font-semibold text-primary-shade" centavos={amount} />
               </article>
             ))}
           </div>
-        )}
-      </div>
-      <div>
-        <h2 className="mb-3 text-lg text-primary">Recent transactions</h2>
-        <ErrorText message={transactionError} />
-        <div className="rounded-lg border border-neutral-200 bg-neutral-0">
-          <PagedGrid
-            rows={transactions}
-            columns={transactionColumns}
-            rowCount={transactionTotal}
-            loading={gridLoading}
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            localeText={{ noRowsLabel: 'No transactions yet.' }}
-          />
+          <div>
+            <h2 className="mb-3 text-lg text-primary">Accounts</h2>
+            {data.accountBalances.total === 0 ? (
+              <Empty label="No active accounts yet. Add one from Accounts." />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {data.accountBalances.data.map((account) => (
+                  <article key={account.id} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4">
+                    <p className="font-medium">{account.name}</p>
+                    <p className="text-sm text-neutral-500">{account.type}</p>
+                    <Money className="mt-2 block text-primary-shade" centavos={account.balance} />
+                  </article>
+                ))}
+              </div>
+            )}
+            <div className="mt-3">
+              <Pager
+                page={accountPage}
+                pageSize={accountPageSize}
+                total={data.accountBalances.total}
+                label="Accounts"
+                onPageChange={(nextPage, nextSize) => {
+                  setAccountPage(nextPage);
+                  setAccountPageSize(nextSize);
+                }}
+              />
+            </div>
+          </div>
+        </>
+      )}
+      {tab === 'transactions' && (
+        <div>
+          <ErrorText message={transactionError} />
+          <div className="rounded-lg border border-neutral-200 bg-neutral-0">
+            <PagedGrid
+              rows={transactions}
+              columns={transactionColumns}
+              rowCount={transactionTotal}
+              loading={gridLoading}
+              paginationModel={paginationModel}
+              onPaginationModelChange={setPaginationModel}
+              localeText={{ noRowsLabel: 'No transactions yet.' }}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </section>
   );
 };
