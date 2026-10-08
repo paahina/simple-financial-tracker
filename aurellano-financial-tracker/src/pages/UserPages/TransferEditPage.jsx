@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { getAccountsRequest, getTransferRequest, updateTransferRequest } from '../../services/api';
-import { dateInput, fromCentavos, toCentavos, toIsoDate } from '../../utils/format';
+import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
+import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const TransferEditPage = () => {
   const { id } = useParams();
@@ -14,8 +16,10 @@ const TransferEditPage = () => {
   const { notify } = useToast();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
+  const [baseline, setBaseline] = useState('');
   const [accounts, setAccounts] = useState([]);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     let active = true;
@@ -23,14 +27,16 @@ const TransferEditPage = () => {
       .then(([transfer, accountList]) => {
         if (!active) return;
         setAccounts(accountList.filter((account) => account.isActive));
-        setForm({
+        const nextForm = {
           fromAccountId: transfer.fromAccountId || 'other',
           senderName: transfer.senderName || '',
           toAccountId: transfer.toAccountId || 'other',
           recipientName: transfer.recipientName || '',
           amount: fromCentavos(transfer.amount),
-          transactionDate: dateInput(transfer.transactionDate),
-        });
+          transactionDate: datetimeLocalInput(transfer.transactionDate),
+        };
+        setForm(nextForm);
+        setBaseline(JSON.stringify(nextForm));
       })
       .catch((err) => {
         if (active) setError(err.message);
@@ -42,12 +48,22 @@ const TransferEditPage = () => {
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    const nextErrors = {
+      fromAccountId: requiredChoice(form.fromAccountId, 'From'),
+      toAccountId: requiredChoice(form.toAccountId, 'To'),
+      senderName: form.fromAccountId === 'other' ? requiredText(form.senderName, 'Sender', 2) : '',
+      recipientName: form.toAccountId === 'other' ? requiredText(form.recipientName, 'Recipient', 2) : '',
+      amount: requiredAmount(form.amount),
+      transactionDate: requiredChoice(form.transactionDate, 'Date'),
+    };
+    setFieldErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
+    if (form.fromAccountId === 'other' && form.toAccountId === 'other') {
+      setError('One side must be one of your accounts');
+      return;
+    }
     setError('');
     try {
-      if (form.fromAccountId === 'other' && form.toAccountId === 'other') {
-        setError('One side must be one of your accounts');
-        return;
-      }
       await updateTransferRequest(
         id,
         {
@@ -56,7 +72,7 @@ const TransferEditPage = () => {
           toAccountId: form.toAccountId === 'other' ? null : form.toAccountId,
           recipientName: form.toAccountId === 'other' ? form.recipientName.trim() : '',
           amount: toCentavos(form.amount),
-          transactionDate: toIsoDate(form.transactionDate),
+          transactionDate: datetimeLocalToIso(form.transactionDate),
         },
         token,
       );
@@ -67,17 +83,17 @@ const TransferEditPage = () => {
     }
   };
 
-  if (error && !form) return <ErrorText message={error} />;
-  if (!form) return <Loading />;
+  const dirty = Boolean(form) && JSON.stringify(form) !== baseline;
 
   return (
-    <form className="mx-auto max-w-lg space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
-      <Link className="text-sm text-primary-shade underline" to="/transfers">
-        Back to transfers
-      </Link>
-      <h1 className="text-2xl font-semibold text-primary-shade">Edit transfer</h1>
+    <FormModal dirty={dirty} closeTo="/transfers">
+      {error && !form && <ErrorText message={error} />}
+      {!form && !error && <Loading />}
+      {form && (
+    <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
+      <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit transfer</h1>
       <ErrorText message={error} />
-      <Field label="From">
+      <Field label="From" error={fieldErrors.fromAccountId}>
         <select className={inputClass} required value={form.fromAccountId} onChange={(event) => setForm({ ...form, fromAccountId: event.target.value })}>
           {accounts.map((account) => (
             <option key={account._id} value={account._id}>
@@ -88,7 +104,7 @@ const TransferEditPage = () => {
         </select>
       </Field>
       {form.fromAccountId === 'other' && (
-        <Field label="Sender">
+        <Field label="Sender" error={fieldErrors.senderName}>
           <input
             className={inputClass}
             required
@@ -98,7 +114,7 @@ const TransferEditPage = () => {
           />
         </Field>
       )}
-      <Field label="To">
+      <Field label="To" error={fieldErrors.toAccountId}>
         <select className={inputClass} required value={form.toAccountId} onChange={(event) => setForm({ ...form, toAccountId: event.target.value })}>
           {accounts.map((account) => (
             <option key={account._id} value={account._id}>
@@ -109,7 +125,7 @@ const TransferEditPage = () => {
         </select>
       </Field>
       {form.toAccountId === 'other' && (
-        <Field label="Recipient">
+        <Field label="Recipient" error={fieldErrors.recipientName}>
           <input
             className={inputClass}
             required
@@ -119,14 +135,16 @@ const TransferEditPage = () => {
           />
         </Field>
       )}
-      <Field label="Amount (PHP)">
+      <Field label="Amount (PHP)" error={fieldErrors.amount}>
         <input className={inputClass} required type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
       </Field>
-      <Field label="Date">
-        <input className={inputClass} required type="date" value={form.transactionDate} onChange={(event) => setForm({ ...form, transactionDate: event.target.value })} />
+      <Field label="Date and time" error={fieldErrors.transactionDate}>
+        <input className={inputClass} required type="datetime-local" value={form.transactionDate} onChange={(event) => setForm({ ...form, transactionDate: event.target.value })} />
       </Field>
       <Button onClick={onSubmit}>Save changes</Button>
     </form>
+      )}
+    </FormModal>
   );
 };
 

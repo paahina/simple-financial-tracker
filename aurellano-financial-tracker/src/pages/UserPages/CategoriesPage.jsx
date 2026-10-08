@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import Button from '../../components/Button';
+import { Link, useLocation } from 'react-router-dom';
+import { CircleOff } from 'lucide-react';
+import Button, { EditLink } from '../../components/Button';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import { deactivateCategoryRequest, getCategoriesRequest } from '../../services/api';
 
 const CategoriesPage = () => {
   const { token } = useAuth();
+  const location = useLocation();
   const { notify } = useToast();
+  const confirm = useConfirm();
   const [categories, setCategories] = useState(null);
   const [error, setError] = useState('');
 
@@ -25,6 +29,14 @@ const CategoriesPage = () => {
   }, [load]);
 
   const onDeactivate = async (id) => {
+    const accepted = await confirm({
+      title: 'Deactivate category?',
+      message: 'This category will no longer appear when you record income or expenses.',
+      confirmLabel: 'Deactivate',
+      confirmVariant: 'warning',
+      confirmIcon: CircleOff,
+    });
+    if (!accepted) return;
     try {
       await deactivateCategoryRequest(id, token);
       notify('Category deactivated');
@@ -38,7 +50,7 @@ const CategoriesPage = () => {
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-primary-shade">Categories</h1>
-        <Link className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0" to="/categories/new">
+        <Link className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0" to="/categories/new" state={{ backgroundLocation: location }}>
           New category
         </Link>
       </div>
@@ -56,11 +68,9 @@ const CategoriesPage = () => {
               </span>
             </span>
             <span className="flex items-center gap-2">
-              <Link className="text-primary-shade underline" to={`/categories/${category._id}/edit`}>
-                Edit
-              </Link>
+              <EditLink to={`/categories/${category._id}/edit`}>Edit</EditLink>
               {category.isActive && (
-                <Button variant="ghost" onClick={() => onDeactivate(category._id)}>
+                <Button variant="warning" icon={CircleOff} onClick={() => onDeactivate(category._id)}>
                   Deactivate
                 </Button>
               )}

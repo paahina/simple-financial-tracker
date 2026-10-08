@@ -164,6 +164,10 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   assert.equal(report.body.income, 1000000);
   assert.equal(report.body.expenses, 25000);
   assert.equal(report.body.net, 975000);
+  assert.equal(report.body.dailyExpenses.total, 1);
+  assert.equal(report.body.dailyExpenses.data[0].label, 'Lunch');
+  assert.equal(report.body.dailyExpenses.data[0].categoryName, 'Food');
+  assert.equal(report.body.dailyExpenses.data[0].amount, 25000);
 
   const other = await register('other@example.com');
   const hidden = await request(app)

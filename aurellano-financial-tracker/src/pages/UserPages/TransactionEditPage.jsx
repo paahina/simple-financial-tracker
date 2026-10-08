@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -11,7 +12,8 @@ import {
   getTransactionRequest,
   updateTransactionRequest,
 } from '../../services/api';
-import { dateInput, fromCentavos, toCentavos, toIsoDate } from '../../utils/format';
+import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
+import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const TransactionEditPage = () => {
   const { id } = useParams();
@@ -19,9 +21,11 @@ const TransactionEditPage = () => {
   const { notify } = useToast();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
+  const [baseline, setBaseline] = useState('');
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     let active = true;
@@ -34,14 +38,16 @@ const TransactionEditPage = () => {
         if (!active) return;
         setAccounts(accountList.filter((account) => account.isActive));
         setCategories(categoryList);
-        setForm({
+        const nextForm = {
           accountId: transaction.accountId,
           type: transaction.type,
           amount: fromCentavos(transaction.amount),
           label: transaction.label,
           categoryId: transaction.categoryId,
-          transactionDate: dateInput(transaction.transactionDate),
-        });
+          transactionDate: datetimeLocalInput(transaction.transactionDate),
+        };
+        setForm(nextForm);
+        setBaseline(JSON.stringify(nextForm));
       })
       .catch((err) => {
         if (active) setError(err.message);
@@ -55,6 +61,15 @@ const TransactionEditPage = () => {
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    const nextErrors = {
+      accountId: requiredChoice(form.accountId, 'Account'),
+      categoryId: requiredChoice(form.categoryId, 'Category'),
+      label: requiredText(form.label, 'Label'),
+      amount: requiredAmount(form.amount),
+      transactionDate: requiredChoice(form.transactionDate, 'Date'),
+    };
+    setFieldErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
     setError('');
     try {
       await updateTransactionRequest(
@@ -62,7 +77,7 @@ const TransactionEditPage = () => {
         {
           ...form,
           amount: toCentavos(form.amount),
-          transactionDate: toIsoDate(form.transactionDate),
+          transactionDate: datetimeLocalToIso(form.transactionDate),
         },
         token,
       );
@@ -73,17 +88,17 @@ const TransactionEditPage = () => {
     }
   };
 
-  if (error && !form) return <ErrorText message={error} />;
-  if (!form) return <Loading />;
+  const dirty = Boolean(form) && JSON.stringify(form) !== baseline;
 
   return (
-    <form className="mx-auto max-w-lg space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
-      <Link className="text-sm text-primary-shade underline" to="/transactions">
-        Back to transactions
-      </Link>
-      <h1 className="text-2xl font-semibold text-primary-shade">Edit transaction</h1>
+    <FormModal dirty={dirty} closeTo="/transactions">
+      {error && !form && <ErrorText message={error} />}
+      {!form && !error && <Loading />}
+      {form && (
+    <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
+      <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit transaction</h1>
       <ErrorText message={error} />
-      <Field label="Account">
+      <Field label="Account" error={fieldErrors.accountId}>
         <select className={inputClass} required value={form.accountId} onChange={(event) => setForm({ ...form, accountId: event.target.value })}>
           {accounts.map((account) => (
             <option key={account._id} value={account._id}>
@@ -98,7 +113,7 @@ const TransactionEditPage = () => {
           <option value="INCOME">Income</option>
         </select>
       </Field>
-      <Field label="Category">
+      <Field label="Category" error={fieldErrors.categoryId}>
         <select className={inputClass} required value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
           <option value="">Select</option>
           {matchingCategories.map((category) => (
@@ -108,17 +123,19 @@ const TransactionEditPage = () => {
           ))}
         </select>
       </Field>
-      <Field label="Label">
+      <Field label="Label" error={fieldErrors.label}>
         <input className={inputClass} required value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} />
       </Field>
-      <Field label="Amount (PHP)">
+      <Field label="Amount (PHP)" error={fieldErrors.amount}>
         <input className={inputClass} required type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
       </Field>
-      <Field label="Date">
-        <input className={inputClass} required type="date" value={form.transactionDate} onChange={(event) => setForm({ ...form, transactionDate: event.target.value })} />
+      <Field label="Date and time" error={fieldErrors.transactionDate}>
+        <input className={inputClass} required type="datetime-local" value={form.transactionDate} onChange={(event) => setForm({ ...form, transactionDate: event.target.value })} />
       </Field>
       <Button onClick={onSubmit}>Save changes</Button>
     </form>
+      )}
+    </FormModal>
   );
 };
 

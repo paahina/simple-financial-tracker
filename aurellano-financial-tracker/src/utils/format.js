@@ -17,7 +17,37 @@ export const formatDate = (value) => {
   });
 };
 
-export const todayInput = () => new Date().toISOString().slice(0, 10);
+export const formatDateTime = (value) => {
+  if (!value) return '';
+  return new Date(value).toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const pad = (value) => String(value).padStart(2, '0');
+
+export const nowDatetimeLocal = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+};
+
+export const datetimeLocalInput = (value) => {
+  if (!value) return nowDatetimeLocal();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return nowDatetimeLocal();
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+export const datetimeLocalToIso = (value) => new Date(value).toISOString();
+
+export const todayInput = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+};
 
 export const dateInput = (value) => {
   if (!value) return todayInput();

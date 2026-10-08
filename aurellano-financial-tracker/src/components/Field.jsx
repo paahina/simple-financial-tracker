@@ -1,7 +1,8 @@
-const Field = ({ label, children }) => (
+const Field = ({ label, error, children }) => (
   <label className="block text-sm text-neutral-900">
     <span className="mb-1 block text-neutral-500">{label}</span>
     {children}
+    {error && <span className="mt-1 block text-xs text-error-foreground">{error}</span>}
   </label>
 );
 

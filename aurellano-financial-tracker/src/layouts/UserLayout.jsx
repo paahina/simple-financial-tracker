@@ -1,62 +1,37 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { matchPath, Outlet, useLocation } from 'react-router-dom';
+import Navbar from '../components/Navbar';
+import AccountsPage from '../pages/UserPages/AccountsPage';
+import CategoriesPage from '../pages/UserPages/CategoriesPage';
+import DebtDetailPage from '../pages/UserPages/DebtDetailPage';
+import DebtsPage from '../pages/UserPages/DebtsPage';
+import TransactionsPage from '../pages/UserPages/TransactionsPage';
+import TransfersPage from '../pages/UserPages/TransfersPage';
 
-const links = [
-  ['/dashboard', 'Dashboard'],
-  ['/accounts', 'Accounts'],
-  ['/categories', 'Categories'],
-  ['/transactions', 'Transactions'],
-  ['/transfers', 'Transfers'],
-  ['/debts', 'Debts'],
-  ['/reports', 'Reports'],
-];
+const backgroundFor = (pathname, state) => {
+  const from = state?.backgroundLocation?.pathname || '';
+  if (matchPath('/accounts/:id/edit', pathname)) return AccountsPage;
+  if (matchPath('/categories/new', pathname) || matchPath('/categories/:id/edit', pathname)) return CategoriesPage;
+  if (matchPath('/transactions/:id/edit', pathname)) return TransactionsPage;
+  if (matchPath('/transfers/:id/edit', pathname)) return TransfersPage;
+  if (matchPath('/debts/:id/payments/:paymentId/edit', pathname)) return DebtDetailPage;
+  if (matchPath('/debts/:id/edit', pathname)) {
+    if (matchPath({ path: '/debts/:id', end: true }, from)) return DebtDetailPage;
+    return DebtsPage;
+  }
+  return null;
+};
 
 const UserLayout = () => {
-  const { user, logout } = useAuth();
+  const location = useLocation();
+  const Background = backgroundFor(location.pathname, location.state);
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900">
-      <header className="border-b border-neutral-200 bg-neutral-0">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-4">
-          <span className="font-semibold text-primary-shade">Tracker</span>
-          <nav className="flex flex-wrap gap-2">
-            {links.map(([to, label]) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `rounded-md px-3 py-2 text-sm ${
-                    isActive ? 'bg-primary text-neutral-0' : 'text-neutral-900 hover:bg-neutral-50'
-                  }`
-                }
-              >
-                {label}
-              </NavLink>
-            ))}
-            {user?.role === 'SYSTEM_ADMIN' && (
-              <NavLink
-                to="/admin"
-                className={({ isActive }) =>
-                  `rounded-md px-3 py-2 text-sm ${
-                    isActive ? 'bg-primary text-neutral-0' : 'text-neutral-900 hover:bg-neutral-50'
-                  }`
-                }
-              >
-                Admin
-              </NavLink>
-            )}
-          </nav>
-          <div className="ml-auto flex items-center gap-3 text-sm">
-            <span className="text-neutral-500">{user?.name}</span>
-            <button type="button" className="text-primary-shade underline" onClick={logout}>
-              Log out
-            </button>
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <Outlet />
+      <Navbar />
+      <main className="mx-auto max-w-6xl px-4 pb-8 pt-40 md:pt-24">
+        {Background ? <Background /> : <Outlet />}
       </main>
+      {Background ? <Outlet /> : null}
     </div>
   );
 };

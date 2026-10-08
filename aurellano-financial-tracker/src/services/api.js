@@ -67,8 +67,8 @@ export const updateCategoryRequest = (id, payload, token) =>
 export const deactivateCategoryRequest = (id, token) =>
   apiRequest(`/api/categories/delete/${id}`, { method: 'DELETE', token });
 
-export const getTransactionsRequest = (token) =>
-  apiRequest('/api/transactions/getAllTransactions?limit=50', { token });
+export const getTransactionsRequest = (token, page = 1, limit = 50) =>
+  apiRequest(`/api/transactions/getAllTransactions?page=${page}&limit=${limit}`, { token });
 
 export const getTransactionRequest = (id, token) =>
   apiRequest(`/api/transactions/get/${id}`, { token });
@@ -82,8 +82,8 @@ export const updateTransactionRequest = (id, payload, token) =>
 export const deleteTransactionRequest = (id, token) =>
   apiRequest(`/api/transactions/delete/${id}`, { method: 'DELETE', token });
 
-export const getTransfersRequest = (token) =>
-  apiRequest('/api/transfers/getAllTransfers?limit=50', { token });
+export const getTransfersRequest = (token, page = 1, limit = 50) =>
+  apiRequest(`/api/transfers/getAllTransfers?page=${page}&limit=${limit}`, { token });
 
 export const getTransferRequest = (id, token) => apiRequest(`/api/transfers/get/${id}`, { token });
 
@@ -118,8 +118,8 @@ export const updateDebtPaymentRequest = (id, payload, token) =>
 export const deleteDebtPaymentRequest = (id, token) =>
   apiRequest(`/api/debts/deletePayment/${id}`, { method: 'DELETE', token });
 
-export const getMonthlyReportRequest = (token, year, month) =>
-  apiRequest(`/api/reports/monthly?year=${year}&month=${month}`, { token });
+export const getMonthlyReportRequest = (token, year, month, page = 1, limit = 10) =>
+  apiRequest(`/api/reports/monthly?year=${year}&month=${month}&page=${page}&limit=${limit}`, { token });
 
 export const getYearlyReportRequest = (token, year) =>
   apiRequest(`/api/reports/yearly?year=${year}`, { token });

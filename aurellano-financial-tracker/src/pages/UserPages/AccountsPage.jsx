@@ -1,21 +1,26 @@
+import { CircleOff } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import Button from '../../components/Button';
+import Button, { EditLink } from '../../components/Button';
+import Money from '../../components/Money';
 import Field, { inputClass } from '../../components/Field';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import { createAccountRequest, deactivateAccountRequest, getAccountsRequest } from '../../services/api';
-import { formatPeso, toCentavos } from '../../utils/format';
+import { toCentavos } from '../../utils/format';
+import { hasErrors, optionalAmount, requiredText } from '../../utils/validate';
 
 const emptyForm = { name: '', type: 'CASH', initialBalance: '', description: '' };
 
 const AccountsPage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirm = useConfirm();
   const [accounts, setAccounts] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const load = useCallback(
     () =>
@@ -31,6 +36,12 @@ const AccountsPage = () => {
 
   const onCreate = async (event) => {
     event.preventDefault();
+    const nextErrors = {
+      name: requiredText(form.name, 'Name', 2),
+      initialBalance: optionalAmount(form.initialBalance, 'Current amount'),
+    };
+    setFieldErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
     setError('');
     try {
       await createAccountRequest(
@@ -52,6 +63,14 @@ const AccountsPage = () => {
   };
 
   const onDeactivate = async (id) => {
+    const accepted = await confirm({
+      title: 'Deactivate account?',
+      message: 'This account will no longer appear when you record new activity.',
+      confirmLabel: 'Deactivate',
+      confirmVariant: 'warning',
+      confirmIcon: CircleOff,
+    });
+    if (!accepted) return;
     try {
       await deactivateAccountRequest(id, token);
       notify('Account deactivated');
@@ -78,14 +97,14 @@ const AccountsPage = () => {
                     {account.type}
                     {account.isActive ? '' : ' · inactive'}
                   </p>
-                  <p className="mt-2 text-primary-shade">{formatPeso(account.balance)}</p>
+                  <Money className="mt-2 block text-primary-shade" centavos={account.balance} />
                 </div>
                 <span className="flex items-center gap-2">
-                  <Link className="text-sm text-primary-shade underline" to={`/accounts/${account._id}/edit`}>
+                  <EditLink className="text-sm" to={`/accounts/${account._id}/edit`}>
                     Edit
-                  </Link>
+                  </EditLink>
                   {account.isActive && (
-                    <Button variant="ghost" onClick={() => onDeactivate(account._id)}>
+                    <Button variant="warning" icon={CircleOff} onClick={() => onDeactivate(account._id)}>
                       Deactivate
                     </Button>
                   )}
@@ -97,7 +116,7 @@ const AccountsPage = () => {
       </div>
       <form className="h-fit space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onCreate}>
         <h2 className="text-lg text-primary">New account</h2>
-        <Field label="Name">
+        <Field label="Name" error={fieldErrors.name}>
           <input className={inputClass} required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         </Field>
         <Field label="Type">
@@ -107,7 +126,7 @@ const AccountsPage = () => {
             <option value="BANK">Bank</option>
           </select>
         </Field>
-        <Field label="Current amount (PHP)">
+        <Field label="Current amount (PHP)" error={fieldErrors.initialBalance}>
           <input className={inputClass} type="number" min="0" step="0.01" value={form.initialBalance} onChange={(event) => setForm({ ...form, initialBalance: event.target.value })} />
         </Field>
         <Button onClick={onCreate}>Save account</Button>

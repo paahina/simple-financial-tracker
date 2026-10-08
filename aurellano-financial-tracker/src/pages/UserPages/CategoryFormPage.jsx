@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { createCategoryRequest, getCategoryRequest, updateCategoryRequest } from '../../services/api';
+import { hasErrors, requiredText } from '../../utils/validate';
 
 const CategoryFormPage = () => {
   const { id } = useParams();
@@ -13,8 +15,11 @@ const CategoryFormPage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
   const navigate = useNavigate();
-  const [form, setForm] = useState(editing ? null : { name: '', type: 'EXPENSE', isActive: true });
+  const emptyForm = { name: '', type: 'EXPENSE', isActive: true };
+  const [form, setForm] = useState(editing ? null : emptyForm);
+  const [baseline, setBaseline] = useState(editing ? '' : JSON.stringify(emptyForm));
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     if (!editing) return undefined;
@@ -22,7 +27,9 @@ const CategoryFormPage = () => {
     getCategoryRequest(id, token)
       .then((category) => {
         if (!active) return;
-        setForm({ name: category.name, type: category.type, isActive: category.isActive });
+        const nextForm = { name: category.name, type: category.type, isActive: category.isActive };
+        setForm(nextForm);
+        setBaseline(JSON.stringify(nextForm));
       })
       .catch((err) => {
         if (active) setError(err.message);
@@ -34,6 +41,9 @@ const CategoryFormPage = () => {
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    const nextErrors = { name: requiredText(form.name, 'Name', 2) };
+    setFieldErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
     setError('');
     try {
       if (editing) {
@@ -49,17 +59,17 @@ const CategoryFormPage = () => {
     }
   };
 
-  if (error && !form) return <ErrorText message={error} />;
-  if (!form) return <Loading />;
+  const dirty = Boolean(form) && JSON.stringify(form) !== baseline;
 
   return (
-    <form className="mx-auto max-w-lg space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
-      <Link className="text-sm text-primary-shade underline" to="/categories">
-        Back to categories
-      </Link>
-      <h1 className="text-2xl font-semibold text-primary-shade">{editing ? 'Edit category' : 'New category'}</h1>
+    <FormModal dirty={dirty} closeTo="/categories">
+      {error && !form && <ErrorText message={error} />}
+      {!form && !error && <Loading />}
+      {form && (
+    <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
+      <h1 className="pr-8 text-2xl font-semibold text-primary-shade">{editing ? 'Edit category' : 'New category'}</h1>
       <ErrorText message={error} />
-      <Field label="Name">
+      <Field label="Name" error={fieldErrors.name}>
         <input className={inputClass} required minLength={2} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
       </Field>
       <Field label="Type">
@@ -76,6 +86,8 @@ const CategoryFormPage = () => {
       )}
       <Button onClick={onSubmit}>{editing ? 'Save changes' : 'Create category'}</Button>
     </form>
+      )}
+    </FormModal>
   );
 };
 

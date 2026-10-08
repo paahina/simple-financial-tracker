@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { getDebtRequest, updateDebtRequest } from '../../services/api';
 import { dateInput, fromCentavos, toCentavos, toIsoDate } from '../../utils/format';
+import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const DebtEditPage = () => {
   const { id } = useParams();
@@ -14,19 +16,23 @@ const DebtEditPage = () => {
   const { notify } = useToast();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
+  const [baseline, setBaseline] = useState('');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     let active = true;
     getDebtRequest(id, token)
       .then(({ debt }) => {
         if (!active) return;
-        setForm({
+        const nextForm = {
           personName: debt.personName,
           originalAmount: fromCentavos(debt.originalAmount),
           dueDate: dateInput(debt.dueDate),
           description: debt.description || '',
-        });
+        };
+        setForm(nextForm);
+        setBaseline(JSON.stringify(nextForm));
       })
       .catch((err) => {
         if (active) setError(err.message);
@@ -38,6 +44,13 @@ const DebtEditPage = () => {
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    const nextErrors = {
+      personName: requiredText(form.personName, 'Name', 2),
+      originalAmount: requiredAmount(form.originalAmount),
+      dueDate: requiredChoice(form.dueDate, 'Due date'),
+    };
+    setFieldErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
     setError('');
     try {
       await updateDebtRequest(
@@ -57,23 +70,23 @@ const DebtEditPage = () => {
     }
   };
 
-  if (error && !form) return <ErrorText message={error} />;
-  if (!form) return <Loading />;
+  const dirty = Boolean(form) && JSON.stringify(form) !== baseline;
 
   return (
-    <form className="mx-auto max-w-lg space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
-      <Link className="text-sm text-primary-shade underline" to={`/debts/${id}`}>
-        Back to debt
-      </Link>
-      <h1 className="text-2xl font-semibold text-primary-shade">Edit debt</h1>
+    <FormModal dirty={dirty} closeTo="/debts">
+      {error && !form && <ErrorText message={error} />}
+      {!form && !error && <Loading />}
+      {form && (
+    <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
+      <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit debt</h1>
       <ErrorText message={error} />
-      <Field label="Name">
+      <Field label="Name" error={fieldErrors.personName}>
         <input className={inputClass} required minLength={2} value={form.personName} onChange={(event) => setForm({ ...form, personName: event.target.value })} />
       </Field>
-      <Field label="Amount (PHP)">
+      <Field label="Amount (PHP)" error={fieldErrors.originalAmount}>
         <input className={inputClass} required type="number" min="0.01" step="0.01" value={form.originalAmount} onChange={(event) => setForm({ ...form, originalAmount: event.target.value })} />
       </Field>
-      <Field label="Due date">
+      <Field label="Due date" error={fieldErrors.dueDate}>
         <input className={inputClass} required type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} />
       </Field>
       <Field label="Description">
@@ -81,6 +94,8 @@ const DebtEditPage = () => {
       </Field>
       <Button onClick={onSubmit}>Save changes</Button>
     </form>
+      )}
+    </FormModal>
   );
 };
 

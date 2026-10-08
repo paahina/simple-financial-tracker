@@ -23,7 +23,7 @@ const getDashboard = async (req, res) => {
       })),
     );
     const totalMoney = accountBalances.reduce((sum, account) => sum + account.balance, 0);
-    const [monthlyIncome, monthlyExpenses, debts, recentTransactions] = await Promise.all([
+    const [monthlyIncome, monthlyExpenses, debts] = await Promise.all([
       sumAmount(Transaction, {
         userId,
         type: 'INCOME',
@@ -35,7 +35,6 @@ const getDashboard = async (req, res) => {
         transactionDate: { $gte: start, $lt: end },
       }),
       Debt.find({ userId }),
-      Transaction.find({ userId }).sort({ transactionDate: -1, createdAt: -1 }).limit(10),
     ]);
 
     let outstandingReceivables = 0;
@@ -52,7 +51,6 @@ const getDashboard = async (req, res) => {
       monthlyNet: monthlyIncome - monthlyExpenses,
       outstandingReceivables,
       accountBalances,
-      recentTransactions,
     });
   } catch (error) {
     sendFinanceError(res, error);

@@ -9,6 +9,11 @@
   --color-neutral-200: var(--neutral-200);
   --color-neutral-500: var(--neutral-500);
   --color-neutral-900: var(--neutral-900);
+  --color-error-foreground: var(--error-foreground);
+  --color-edit: var(--edit);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-destructive-shade: var(--destructive-shade);
   --font-sans: 'Segoe UI', sans-serif;
 }
 

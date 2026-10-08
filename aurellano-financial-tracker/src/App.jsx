@@ -3,6 +3,8 @@ import GuestRoute from './components/GuestRoute';
 import ProtectedRoute from './components/ProtectedRoute';
 import Toast from './components/Toast';
 import { AuthProvider } from './context/AuthContext';
+import { ConfirmProvider } from './context/ConfirmContext';
+import { PrivacyProvider } from './context/PrivacyContext';
 import { ToastProvider } from './context/ToastContext';
 import AdminLayout from './layouts/AdminLayout';
 import AuthLayout from './layouts/AuthLayout';
@@ -84,8 +86,12 @@ const router = createBrowserRouter([
 const App = () => (
   <AuthProvider>
     <ToastProvider>
-      <Toast />
-      <RouterProvider router={router} />
+      <ConfirmProvider>
+        <PrivacyProvider>
+          <Toast />
+          <RouterProvider router={router} />
+        </PrivacyProvider>
+      </ConfirmProvider>
     </ToastProvider>
   </AuthProvider>
 );

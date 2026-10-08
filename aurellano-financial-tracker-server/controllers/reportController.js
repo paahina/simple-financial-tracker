@@ -3,6 +3,7 @@ const Category = require('../models/categoryModel');
 const { HttpStatus } = require('../config/constants');
 const { FinanceError, categoryTotals, monthRange, sumAmount, toId, sendFinanceError } =
   require('../utils/finance');
+const { parsePagination, paginatedResponse } = require('../utils/pagination');
 
 const periodTotals = async (userId, start, end) => {
   const matchBase = {
@@ -42,7 +43,33 @@ const getMonthlyReport = async (req, res) => {
     const { year, month } = readYearMonth(req.query);
     const { start, end } = monthRange(year, month);
     const report = await periodTotals(req.user.id, start, end);
-    res.status(HttpStatus.OK).json({ year, month, ...report });
+    const { page, limit, skip } = parsePagination(req.query);
+    const expenseFilter = {
+      userId: req.user.id,
+      type: 'EXPENSE',
+      transactionDate: { $gte: start, $lt: end },
+    };
+    const [expenseTotal, expenses] = await Promise.all([
+      Transaction.countDocuments(expenseFilter),
+      Transaction.find(expenseFilter)
+        .sort({ transactionDate: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('categoryId', 'name'),
+    ]);
+    const dailyExpenses = paginatedResponse({
+      data: expenses.map((item) => ({
+        id: item._id,
+        transactionDate: item.transactionDate,
+        categoryName: item.categoryId?.name || 'Category',
+        label: item.label,
+        amount: item.amount,
+      })),
+      total: expenseTotal,
+      page,
+      limit,
+    });
+    res.status(HttpStatus.OK).json({ year, month, ...report, dailyExpenses });
   } catch (error) {
     sendFinanceError(res, error);
   }

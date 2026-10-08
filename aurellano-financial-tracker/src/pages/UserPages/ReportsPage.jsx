@@ -1,11 +1,38 @@
+import { BarChart } from '@mui/x-charts/BarChart';
 import { useEffect, useState } from 'react';
 import Field, { inputClass } from '../../components/Field';
+import PagedGrid from '../../components/PagedGrid';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { getMonthlyReportRequest, getYearlyReportRequest } from '../../services/api';
-import { formatPeso } from '../../utils/format';
+import { formatDate, formatPeso } from '../../utils/format';
 
 const now = new Date();
+const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const pesoFromChart = (value) => formatPeso(Math.round((Number(value) || 0) * 100));
+
+const expenseColumns = [
+  {
+    field: 'transactionDate',
+    headerName: 'Date',
+    flex: 1,
+    minWidth: 140,
+    sortable: false,
+    filterable: false,
+    renderCell: ({ row }) => formatDate(row.transactionDate),
+  },
+  { field: 'categoryName', headerName: 'Category', flex: 1, minWidth: 140, sortable: false, filterable: false },
+  { field: 'label', headerName: 'Label', flex: 1, minWidth: 140, sortable: false, filterable: false },
+  {
+    field: 'amount',
+    headerName: 'Amount',
+    width: 140,
+    sortable: false,
+    filterable: false,
+    renderCell: ({ row }) => formatPeso(row.amount),
+  },
+];
 
 const ReportsPage = () => {
   const { token } = useAuth();
@@ -14,18 +41,14 @@ const ReportsPage = () => {
   const [monthly, setMonthly] = useState(null);
   const [yearly, setYearly] = useState(null);
   const [error, setError] = useState('');
+  const [expenseLoading, setExpenseLoading] = useState(true);
+  const [expenseModel, setExpenseModel] = useState({ page: 0, pageSize: 10 });
 
   useEffect(() => {
     let active = true;
-    Promise.all([
-      getMonthlyReportRequest(token, year, month),
-      getYearlyReportRequest(token, year),
-    ])
-      .then(([monthReport, yearReport]) => {
-        if (!active) return;
-        setError('');
-        setMonthly(monthReport);
-        setYearly(yearReport);
+    getYearlyReportRequest(token, year)
+      .then((yearReport) => {
+        if (active) setYearly(yearReport);
       })
       .catch((err) => {
         if (active) setError(err.message);
@@ -33,17 +56,49 @@ const ReportsPage = () => {
     return () => {
       active = false;
     };
-  }, [token, year, month]);
+  }, [token, year]);
+
+  useEffect(() => {
+    let active = true;
+    setExpenseLoading(true);
+    getMonthlyReportRequest(token, year, month, expenseModel.page + 1, expenseModel.pageSize)
+      .then((monthReport) => {
+        if (!active) return;
+        setError('');
+        setMonthly(monthReport);
+      })
+      .catch((err) => {
+        if (active) setError(err.message);
+      })
+      .finally(() => {
+        if (active) setExpenseLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, year, month, expenseModel]);
+
+  const onYearChange = (event) => {
+    setYear(event.target.value);
+    setExpenseModel((model) => ({ ...model, page: 0 }));
+  };
+
+  const onMonthChange = (event) => {
+    setMonth(event.target.value);
+    setExpenseModel((model) => ({ ...model, page: 0 }));
+  };
+
+  const expensesByMonth = yearly?.monthlyBreakdown.map((row) => row.expenses / 100) || [];
 
   return (
     <section className="space-y-6">
       <h1 className="text-2xl font-semibold text-primary-shade">Reports</h1>
       <div className="flex gap-3">
         <Field label="Year">
-          <input className={inputClass} type="number" value={year} onChange={(event) => setYear(event.target.value)} />
+          <input className={inputClass} type="number" value={year} onChange={onYearChange} />
         </Field>
         <Field label="Month">
-          <input className={inputClass} type="number" min="1" max="12" value={month} onChange={(event) => setMonth(event.target.value)} />
+          <input className={inputClass} type="number" min="1" max="12" value={month} onChange={onMonthChange} />
         </Field>
       </div>
       <ErrorText message={error} />
@@ -69,27 +124,37 @@ const ReportsPage = () => {
         </div>
       )}
       {yearly && (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-neutral-0">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-primary text-neutral-0">
-              <tr>
-                <th className="px-3 py-2">Month</th>
-                <th className="px-3 py-2">Income</th>
-                <th className="px-3 py-2">Expenses</th>
-                <th className="px-3 py-2">Net</th>
-              </tr>
-            </thead>
-            <tbody>
-              {yearly.monthlyBreakdown.map((row) => (
-                <tr key={row.month} className="border-t border-neutral-200">
-                  <td className="px-3 py-2">{row.month}</td>
-                  <td className="px-3 py-2">{formatPeso(row.income)}</td>
-                  <td className="px-3 py-2">{formatPeso(row.expenses)}</td>
-                  <td className="px-3 py-2">{formatPeso(row.net)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <article className="rounded-lg border border-neutral-200 bg-neutral-0 p-4">
+          <h2 className="mb-3 text-primary">Expenses by month</h2>
+          <BarChart
+            height={320}
+            xAxis={[{ data: monthLabels, scaleType: 'band' }]}
+            yAxis={[{ valueFormatter: pesoFromChart }]}
+            series={[
+              {
+                data: expensesByMonth,
+                label: 'Expenses',
+                color: '#3A3A3A',
+                valueFormatter: pesoFromChart,
+              },
+            ]}
+          />
+        </article>
+      )}
+      {monthly && (
+        <div>
+          <h2 className="mb-3 text-primary">Daily expenses</h2>
+          <div className="rounded-lg border border-neutral-200 bg-neutral-0">
+            <PagedGrid
+              rows={monthly.dailyExpenses.data}
+              columns={expenseColumns}
+              rowCount={monthly.dailyExpenses.total}
+              loading={expenseLoading}
+              paginationModel={expenseModel}
+              onPaginationModelChange={setExpenseModel}
+              localeText={{ noRowsLabel: 'No expenses in this month.' }}
+            />
+          </div>
         </div>
       )}
     </section>

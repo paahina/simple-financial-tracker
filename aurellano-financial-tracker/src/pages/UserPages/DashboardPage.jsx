@@ -1,19 +1,69 @@
 import { useEffect, useState } from 'react';
+import Money from '../../components/Money';
+import PagedGrid from '../../components/PagedGrid';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
-import { getDashboardRequest } from '../../services/api';
-import { formatDate, formatPeso } from '../../utils/format';
+import { getDashboardRequest, getTransactionsRequest } from '../../services/api';
+import { formatDateTime, formatPeso } from '../../utils/format';
+
+const transactionColumns = [
+  { field: 'label', headerName: 'Label', flex: 1, minWidth: 140, sortable: false, filterable: false },
+  {
+    field: 'transactionDate',
+    headerName: 'Date',
+    flex: 1,
+    minWidth: 180,
+    sortable: false,
+    filterable: false,
+    renderCell: ({ row }) => formatDateTime(row.transactionDate),
+  },
+  { field: 'type', headerName: 'Type', width: 120, sortable: false, filterable: false },
+  {
+    field: 'amount',
+    headerName: 'Amount',
+    width: 140,
+    sortable: false,
+    filterable: false,
+    renderCell: ({ row }) => `${row.type === 'EXPENSE' ? '-' : '+'}${formatPeso(row.amount)}`,
+  },
+];
 
 const DashboardPage = () => {
   const { token } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [transactions, setTransactions] = useState([]);
+  const [transactionTotal, setTransactionTotal] = useState(0);
+  const [transactionError, setTransactionError] = useState('');
+  const [gridLoading, setGridLoading] = useState(true);
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
 
   useEffect(() => {
     getDashboardRequest(token)
       .then(setData)
       .catch((err) => setError(err.message));
   }, [token]);
+
+  useEffect(() => {
+    let active = true;
+    setGridLoading(true);
+    getTransactionsRequest(token, paginationModel.page + 1, paginationModel.pageSize)
+      .then((result) => {
+        if (!active) return;
+        setTransactionError('');
+        setTransactions(result.data.map((item) => ({ ...item, id: item._id })));
+        setTransactionTotal(result.total);
+      })
+      .catch((err) => {
+        if (active) setTransactionError(err.message);
+      })
+      .finally(() => {
+        if (active) setGridLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, paginationModel]);
 
   if (error) return <ErrorText message={error} />;
   if (!data) return <Loading />;
@@ -33,7 +83,7 @@ const DashboardPage = () => {
         {cards.map(([label, amount]) => (
           <article key={label} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4">
             <p className="text-sm text-neutral-500">{label}</p>
-            <p className="mt-2 text-xl font-semibold text-primary-shade">{formatPeso(amount)}</p>
+            <Money className="mt-2 block text-xl font-semibold text-primary-shade" centavos={amount} />
           </article>
         ))}
       </div>
@@ -47,7 +97,7 @@ const DashboardPage = () => {
               <article key={account.id} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4">
                 <p className="font-medium">{account.name}</p>
                 <p className="text-sm text-neutral-500">{account.type}</p>
-                <p className="mt-2 text-primary-shade">{formatPeso(account.balance)}</p>
+                <Money className="mt-2 block text-primary-shade" centavos={account.balance} />
               </article>
             ))}
           </div>
@@ -55,24 +105,18 @@ const DashboardPage = () => {
       </div>
       <div>
         <h2 className="mb-3 text-lg text-primary">Recent transactions</h2>
-        {data.recentTransactions.length === 0 ? (
-          <Empty label="No transactions yet." />
-        ) : (
-          <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-neutral-0">
-            {data.recentTransactions.map((item) => (
-              <li key={item._id} className="flex items-center justify-between px-4 py-3 text-sm">
-                <span>
-                  {item.label}
-                  <span className="ml-2 text-neutral-500">{formatDate(item.transactionDate)}</span>
-                </span>
-                <span className={item.type === 'EXPENSE' ? 'text-primary-tint' : 'text-primary-shade'}>
-                  {item.type === 'EXPENSE' ? '-' : '+'}
-                  {formatPeso(item.amount)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ErrorText message={transactionError} />
+        <div className="rounded-lg border border-neutral-200 bg-neutral-0">
+          <PagedGrid
+            rows={transactions}
+            columns={transactionColumns}
+            rowCount={transactionTotal}
+            loading={gridLoading}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            localeText={{ noRowsLabel: 'No transactions yet.' }}
+          />
+        </div>
       </div>
     </section>
   );

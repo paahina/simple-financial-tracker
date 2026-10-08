@@ -7,6 +7,11 @@ export const colors = {
   neutral200: '#E5E5E5',
   neutral500: '#737373',
   neutral900: '#171717',
+  errorForeground: '#FF2D2D',
+  edit: '#2563EB',
+  warning: '#D97706',
+  destructive: '#DC2626',
+  destructiveShade: '#B91C1C',
 };
 
 const cssVariables = {
@@ -18,6 +23,11 @@ const cssVariables = {
   '--neutral-200': colors.neutral200,
   '--neutral-500': colors.neutral500,
   '--neutral-900': colors.neutral900,
+  '--error-foreground': colors.errorForeground,
+  '--edit': colors.edit,
+  '--warning': colors.warning,
+  '--destructive': colors.destructive,
+  '--destructive-shade': colors.destructiveShade,
 };
 
 export function applyTheme(target = document.documentElement) {
