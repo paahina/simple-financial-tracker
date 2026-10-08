@@ -51,8 +51,21 @@ const DebtsPage = () => {
   );
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let active = true;
+    getDebtsRequest(token, { page: page + 1, limit: pageSize, status: status.value })
+      .then((result) => {
+        if (!active) return;
+        setDebts(result.data);
+        setTotal(result.total);
+        setCounts(result.counts || emptyCounts);
+      })
+      .catch((err) => {
+        if (active) setError(err.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, page, pageSize, status.value]);
 
   const onDelete = async (debtId) => {
     const accepted = await confirm({
@@ -89,6 +102,9 @@ const DebtsPage = () => {
         value={statusId}
         tabs={statusTabs.map((tab) => ({ id: tab.id, label: `${tab.label} ${counts[tab.value]}` }))}
         onChange={(id) => {
+          if (id === statusId) return;
+          setDebts(null);
+          setError('');
           setPage(0);
           setSearchParams(id === 'pending' ? {} : { status: id });
         }}
@@ -130,16 +146,18 @@ const DebtsPage = () => {
           </li>
         ))}
       </ul>
-      <Pager
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        label="Debts"
-        onPageChange={(nextPage, nextSize) => {
-          setPage(nextPage);
-          setPageSize(nextSize);
-        }}
-      />
+      {debts && (
+        <Pager
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          label="Debts"
+          onPageChange={(nextPage, nextSize) => {
+            setPage(nextPage);
+            setPageSize(nextSize);
+          }}
+        />
+      )}
     </section>
   );
 };

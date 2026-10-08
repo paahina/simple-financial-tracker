@@ -80,7 +80,10 @@ const Navbar = () => {
   return (
     <header className="fixed inset-x-0 top-0 z-30 border-b border-neutral-200 bg-neutral-0">
       <div className="flex w-full items-center gap-3 px-4 py-3 lg:gap-4 lg:px-6 lg:py-4">
-        <span className="shrink-0 font-semibold text-primary-shade">Tracker</span>
+        <span className="flex shrink-0 items-center gap-2">
+          <img src="/favicon.svg" alt="Tracker" className="h-8 w-8 rounded-md" />
+          <span className="hidden font-semibold text-primary-shade lg:inline" aria-hidden="true">Tracker</span>
+        </span>
         <div className="relative lg:hidden" ref={menuRef}>
           <button
             type="button"
