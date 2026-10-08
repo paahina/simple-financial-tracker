@@ -6,7 +6,7 @@ const debtSchema = new mongoose.Schema(
     personName: { type: String, required: true, trim: true, maxlength: 100 },
     description: { type: String, trim: true, default: '' },
     originalAmount: { type: Number, required: true, min: 1 },
-    dueDate: { type: Date, required: true },
+    dueDate: { type: Date, default: null },
     status: {
       type: String,
       required: true,

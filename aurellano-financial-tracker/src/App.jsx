@@ -23,8 +23,10 @@ import DebtEditPage from './pages/UserPages/DebtEditPage';
 import DebtsPage from './pages/UserPages/DebtsPage';
 import PaymentEditPage from './pages/UserPages/PaymentEditPage';
 import ReportsPage from './pages/UserPages/ReportsPage';
+import TransactionCreatePage from './pages/UserPages/TransactionCreatePage';
 import TransactionEditPage from './pages/UserPages/TransactionEditPage';
 import TransactionsPage from './pages/UserPages/TransactionsPage';
+import TransferCreatePage from './pages/UserPages/TransferCreatePage';
 import TransferEditPage from './pages/UserPages/TransferEditPage';
 import TransfersPage from './pages/UserPages/TransfersPage';
 
@@ -57,8 +59,10 @@ const router = createBrowserRouter([
           { path: '/categories/new', element: <CategoryFormPage /> },
           { path: '/categories/:id/edit', element: <CategoryFormPage /> },
           { path: '/transactions', element: <TransactionsPage /> },
+          { path: '/transactions/new', element: <TransactionCreatePage /> },
           { path: '/transactions/:id/edit', element: <TransactionEditPage /> },
           { path: '/transfers', element: <TransfersPage /> },
+          { path: '/transfers/new', element: <TransferCreatePage /> },
           { path: '/transfers/:id/edit', element: <TransferEditPage /> },
           { path: '/debts', element: <DebtsPage /> },
           { path: '/debts/:id/edit', element: <DebtEditPage /> },

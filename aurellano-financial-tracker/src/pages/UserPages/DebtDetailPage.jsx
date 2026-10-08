@@ -67,7 +67,7 @@ const DebtDetailPage = () => {
         <div>
           <h1 className="text-2xl font-semibold text-primary-shade">{debt.personName}</h1>
           <p className="text-sm text-neutral-500">
-            {debt.status} · due {formatDate(debt.dueDate)}
+            {debt.status} · {debt.dueDate ? `due ${formatDate(debt.dueDate)}` : 'No due date'}
           </p>
           <p className="mt-2">
             Remaining {formatPeso(debt.remainingAmount)} of {formatPeso(debt.originalAmount)}

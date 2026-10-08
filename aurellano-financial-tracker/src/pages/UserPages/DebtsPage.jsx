@@ -13,8 +13,9 @@ import {
   deleteDebtRequest,
   getAccountsRequest,
   getDebtsRequest,
+  updateDebtRequest,
 } from '../../services/api';
-import { datetimeLocalToIso, formatDate, formatPeso, nowDatetimeLocal, todayInput, toCentavos, toIsoDate } from '../../utils/format';
+import { datetimeLocalToIso, formatDate, formatPeso, nowDatetimeLocal, toCentavos, toIsoDate } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const DebtsPage = () => {
@@ -26,13 +27,15 @@ const DebtsPage = () => {
   const [error, setError] = useState('');
   const [debtErrors, setDebtErrors] = useState({});
   const [paymentErrors, setPaymentErrors] = useState({});
-  const [debtForm, setDebtForm] = useState({ personName: '', originalAmount: '', dueDate: todayInput() });
+  const [debtForm, setDebtForm] = useState({ personName: '', originalAmount: '', dueDate: '' });
   const [paymentForm, setPaymentForm] = useState({
     debtId: '',
     accountId: '',
     amount: '',
     paymentDate: nowDatetimeLocal(),
   });
+  const [addAmounts, setAddAmounts] = useState({});
+  const [addErrors, setAddErrors] = useState({});
 
   const load = useCallback(
     () =>
@@ -54,7 +57,6 @@ const DebtsPage = () => {
     const nextErrors = {
       personName: requiredText(debtForm.personName, 'Name', 2),
       originalAmount: requiredAmount(debtForm.originalAmount),
-      dueDate: requiredChoice(debtForm.dueDate, 'Due date'),
     };
     setDebtErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
@@ -64,12 +66,12 @@ const DebtsPage = () => {
         {
           personName: debtForm.personName,
           originalAmount: toCentavos(debtForm.originalAmount),
-          dueDate: toIsoDate(debtForm.dueDate),
+          ...(debtForm.dueDate ? { dueDate: toIsoDate(debtForm.dueDate) } : {}),
         },
         token,
       );
       notify('Debt saved');
-      setDebtForm({ personName: '', originalAmount: '', dueDate: todayInput() });
+      setDebtForm({ personName: '', originalAmount: '', dueDate: '' });
       await load();
     } catch (err) {
       setError(err.message);
@@ -88,6 +90,21 @@ const DebtsPage = () => {
     try {
       await deleteDebtRequest(debtId, token);
       notify('Debt deleted');
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const onAddAmount = async (debt) => {
+    const message = requiredAmount(addAmounts[debt._id], 'Additional amount');
+    setAddErrors((current) => ({ ...current, [debt._id]: message }));
+    if (message) return;
+    setError('');
+    try {
+      await updateDebtRequest(debt._id, { additionalAmount: toCentavos(addAmounts[debt._id]) }, token);
+      notify('Amount added');
+      setAddAmounts((current) => ({ ...current, [debt._id]: '' }));
       await load();
     } catch (err) {
       setError(err.message);
@@ -136,11 +153,28 @@ const DebtsPage = () => {
               <div>
                 <p className="font-medium">{debt.personName}</p>
                 <p className="text-neutral-500">
-                  {debt.status} · due {formatDate(debt.dueDate)}
+                  {debt.status} · {debt.dueDate ? `due ${formatDate(debt.dueDate)}` : 'No due date'}
                 </p>
                 <p className="mt-2">
                   Remaining {formatPeso(debt.remainingAmount)} of {formatPeso(debt.originalAmount)}
                 </p>
+                <div className="mt-3 flex flex-wrap items-end gap-2">
+                  <Field label="Additional amount (PHP)" error={addErrors[debt._id]}>
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={addAmounts[debt._id] || ''}
+                      onChange={(event) =>
+                        setAddAmounts((current) => ({ ...current, [debt._id]: event.target.value }))
+                      }
+                    />
+                  </Field>
+                  <Button variant="tint" onClick={() => onAddAmount(debt)}>
+                    Add amount
+                  </Button>
+                </div>
               </div>
               <span className="flex items-center gap-2">
                 <Link className="text-primary-shade underline" to={`/debts/${debt._id}`}>
@@ -166,8 +200,8 @@ const DebtsPage = () => {
           <Field label="Amount (PHP)" error={debtErrors.originalAmount}>
             <input className={inputClass} required type="number" min="0.01" step="0.01" value={debtForm.originalAmount} onChange={(event) => setDebtForm({ ...debtForm, originalAmount: event.target.value })} />
           </Field>
-          <Field label="Due date" error={debtErrors.dueDate}>
-            <input className={inputClass} required type="date" value={debtForm.dueDate} onChange={(event) => setDebtForm({ ...debtForm, dueDate: event.target.value })} />
+          <Field label="Due date">
+            <input className={inputClass} type="date" value={debtForm.dueDate} onChange={(event) => setDebtForm({ ...debtForm, dueDate: event.target.value })} />
           </Field>
           <Button onClick={onCreateDebt}>Save debt</Button>
         </form>

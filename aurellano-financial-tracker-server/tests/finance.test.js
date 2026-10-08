@@ -125,6 +125,13 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   assert.equal(debt.status, 201);
   assert.equal(debt.body.debt.status, 'OVERDUE');
 
+  const added = await request(app).put(`/api/debts/update/${debt.body.debt._id}`).set(auth(token)).send({
+    additionalAmount: 10000,
+  });
+  assert.equal(added.status, 200);
+  assert.equal(added.body.originalAmount, 510000);
+  assert.equal(added.body.remainingAmount, 510000);
+
   const payment = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
     debtId: debt.body.debt._id,
     accountId: gcash.body.account._id,
@@ -132,12 +139,12 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
     paymentDate: today,
   });
   assert.equal(payment.status, 201);
-  assert.equal(payment.body.debt.remainingAmount, 300000);
+  assert.equal(payment.body.debt.remainingAmount, 310000);
 
   const tooMuch = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
     debtId: debt.body.debt._id,
     accountId: gcash.body.account._id,
-    amount: 300001,
+    amount: 310001,
     paymentDate: today,
   });
   assert.equal(tooMuch.status, 400);
@@ -154,7 +161,15 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   assert.equal(dashboard.body.monthlyIncome, 1000000);
   assert.equal(dashboard.body.monthlyExpenses, 25000);
   assert.equal(dashboard.body.monthlyNet, 975000);
-  assert.equal(dashboard.body.outstandingReceivables, 300000);
+  assert.equal(dashboard.body.outstandingReceivables, 310000);
+
+  const openDebt = await request(app).post('/api/debts/create').set(auth(token)).send({
+    personName: 'No date',
+    originalAmount: 1000,
+  });
+  assert.equal(openDebt.status, 201);
+  assert.equal(openDebt.body.debt.dueDate, null);
+  assert.equal(openDebt.body.debt.status, 'PENDING');
 
   const now = new Date();
   const report = await request(app)

@@ -141,7 +141,7 @@ const debtValidation = [
   body('personName').isString().trim().isLength({ min: 2, max: 100 }),
   body('description').optional().isString().trim(),
   body('originalAmount').isInt({ min: 1 }),
-  body('dueDate').isISO8601(),
+  body('dueDate').optional({ values: 'falsy' }).isISO8601(),
   handleValidation,
 ];
 
@@ -149,7 +149,8 @@ const debtUpdateValidation = [
   body('personName').optional().isString().trim().isLength({ min: 2, max: 100 }),
   body('description').optional().isString().trim(),
   body('originalAmount').optional().isInt({ min: 1 }),
-  body('dueDate').optional().isISO8601(),
+  body('additionalAmount').optional().isInt({ min: 1 }),
+  body('dueDate').optional({ values: 'falsy' }).isISO8601(),
   handleValidation,
 ];
 

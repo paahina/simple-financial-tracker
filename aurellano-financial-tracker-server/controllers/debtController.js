@@ -66,7 +66,7 @@ const createDebt = async (req, res) => {
       personName: req.body.personName,
       description: req.body.description || '',
       originalAmount: Number(req.body.originalAmount),
-      dueDate: new Date(req.body.dueDate),
+      dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
       status: 'PENDING',
     });
     res.status(HttpStatus.CREATED).json({
@@ -83,13 +83,18 @@ const updateDebt = async (req, res) => {
     const debt = await requireDebt(req.user.id, req.params.id);
     if (req.body.personName !== undefined) debt.personName = req.body.personName;
     if (req.body.description !== undefined) debt.description = req.body.description;
-    if (req.body.dueDate !== undefined) debt.dueDate = new Date(req.body.dueDate);
+    if (req.body.dueDate !== undefined) {
+      debt.dueDate = req.body.dueDate ? new Date(req.body.dueDate) : null;
+    }
     if (req.body.originalAmount !== undefined) {
       const paid = await debtTotals(DebtPayment, debt._id);
       if (Number(req.body.originalAmount) < paid) {
         throw new FinanceError('Original amount cannot be less than recorded payments');
       }
       debt.originalAmount = Number(req.body.originalAmount);
+    }
+    if (req.body.additionalAmount !== undefined) {
+      debt.originalAmount += Number(req.body.additionalAmount);
     }
     await debt.save();
     res.status(HttpStatus.OK).json(await presentDebt(debt));
