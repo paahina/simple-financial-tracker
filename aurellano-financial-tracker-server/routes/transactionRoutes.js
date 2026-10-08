@@ -3,6 +3,7 @@ const {
   createTransaction,
   deleteTransaction,
   getAllTransactions,
+  getTransactionDays,
   getTransactionById,
   updateTransaction,
 } = require('../controllers/transactionController');
@@ -17,6 +18,7 @@ const router = express.Router();
 
 router.use(protect);
 router.get('/getAllTransactions', getAllTransactions);
+router.get('/days', getTransactionDays);
 router.get('/get/:id', mongoIdParamValidation, getTransactionById);
 router.post('/create', transactionValidation, createTransaction);
 router.put(

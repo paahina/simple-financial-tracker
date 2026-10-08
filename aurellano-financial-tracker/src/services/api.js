@@ -1,4 +1,15 @@
+import { browserTimeZone } from '../utils/format';
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5001';
+
+const toQuery = (params) => {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value));
+  });
+  const query = search.toString();
+  return query ? `?${query}` : '';
+};
 
 const parseResponse = async (response) => {
   const data = await response.json().catch(() => ({}));
@@ -67,8 +78,14 @@ export const updateCategoryRequest = (id, payload, token) =>
 export const deactivateCategoryRequest = (id, token) =>
   apiRequest(`/api/categories/delete/${id}`, { method: 'DELETE', token });
 
-export const getTransactionsRequest = (token, page = 1, limit = 50) =>
-  apiRequest(`/api/transactions/getAllTransactions?page=${page}&limit=${limit}`, { token });
+export const getTransactionDaysRequest = (token, page = 1, limit = 10) =>
+  apiRequest(
+    `/api/transactions/days${toQuery({ page, limit, timezone: browserTimeZone() })}`,
+    { token },
+  );
+
+export const getTransactionsRequest = (token, page = 1, limit = 50, range = {}) =>
+  apiRequest(`/api/transactions/getAllTransactions${toQuery({ page, limit, ...range })}`, { token });
 
 export const getTransactionRequest = (id, token) =>
   apiRequest(`/api/transactions/get/${id}`, { token });
@@ -82,8 +99,11 @@ export const updateTransactionRequest = (id, payload, token) =>
 export const deleteTransactionRequest = (id, token) =>
   apiRequest(`/api/transactions/delete/${id}`, { method: 'DELETE', token });
 
-export const getTransfersRequest = (token, page = 1, limit = 50) =>
-  apiRequest(`/api/transfers/getAllTransfers?page=${page}&limit=${limit}`, { token });
+export const getTransferDaysRequest = (token, page = 1, limit = 10) =>
+  apiRequest(`/api/transfers/days${toQuery({ page, limit, timezone: browserTimeZone() })}`, { token });
+
+export const getTransfersRequest = (token, page = 1, limit = 50, range = {}) =>
+  apiRequest(`/api/transfers/getAllTransfers${toQuery({ page, limit, ...range })}`, { token });
 
 export const getTransferRequest = (id, token) => apiRequest(`/api/transfers/get/${id}`, { token });
 

@@ -1,9 +1,11 @@
+const { Types } = require('mongoose');
 const Transaction = require('../models/transactionModel');
 const Account = require('../models/accountModel');
 const { HttpStatus } = require('../config/constants');
 const { requireCategory } = require('./categoryController');
 const { requireOwnedAccount, sendFinanceError } = require('../utils/finance');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
+const { listActivityDays } = require('../utils/dayGroups');
 
 const requireTransaction = async (userId, transactionId) => {
   const transaction = await Transaction.findOne({ _id: transactionId, userId });
@@ -13,6 +15,20 @@ const requireTransaction = async (userId, transactionId) => {
     throw error;
   }
   return transaction;
+};
+
+const getTransactionDays = async (req, res) => {
+  try {
+    const body = await listActivityDays(
+      Transaction,
+      { userId: new Types.ObjectId(req.user.id) },
+      req.query,
+      { signed: true },
+    );
+    res.status(HttpStatus.OK).json(body);
+  } catch (error) {
+    sendFinanceError(res, error);
+  }
 };
 
 const getAllTransactions = async (req, res) => {
@@ -110,6 +126,7 @@ const deleteTransaction = async (req, res) => {
 
 module.exports = {
   getAllTransactions,
+  getTransactionDays,
   getTransactionById,
   createTransaction,
   updateTransaction,

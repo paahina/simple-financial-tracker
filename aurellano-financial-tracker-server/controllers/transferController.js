@@ -1,8 +1,10 @@
+const { Types } = require('mongoose');
 const Transfer = require('../models/transferModel');
 const Account = require('../models/accountModel');
 const { HttpStatus } = require('../config/constants');
 const { FinanceError, requireOwnedAccount, sendFinanceError } = require('../utils/finance');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
+const { listActivityDays } = require('../utils/dayGroups');
 
 const assertDifferentAccounts = (fromAccountId, toAccountId) => {
   if (String(fromAccountId) === String(toAccountId)) {
@@ -34,10 +36,28 @@ const resolveParties = ({ fromAccountId, senderName, toAccountId, recipientName 
   return { from, to };
 };
 
+const getTransferDays = async (req, res) => {
+  try {
+    const body = await listActivityDays(
+      Transfer,
+      { userId: new Types.ObjectId(req.user.id) },
+      req.query,
+    );
+    res.status(HttpStatus.OK).json(body);
+  } catch (error) {
+    sendFinanceError(res, error);
+  }
+};
+
 const getAllTransfers = async (req, res) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
     const filter = { userId: req.user.id };
+    if (req.query.startDate || req.query.endDate) {
+      filter.transactionDate = {};
+      if (req.query.startDate) filter.transactionDate.$gte = new Date(req.query.startDate);
+      if (req.query.endDate) filter.transactionDate.$lte = new Date(req.query.endDate);
+    }
     const [total, transfers] = await Promise.all([
       Transfer.countDocuments(filter),
       Transfer.find(filter).sort({ transactionDate: -1, createdAt: -1 }).skip(skip).limit(limit),
@@ -136,6 +156,7 @@ const deleteTransfer = async (req, res) => {
 
 module.exports = {
   getAllTransfers,
+  getTransferDays,
   getTransferById,
   createTransfer,
   updateTransfer,

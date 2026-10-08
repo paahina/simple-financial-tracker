@@ -3,6 +3,7 @@ const {
   createTransfer,
   deleteTransfer,
   getAllTransfers,
+  getTransferDays,
   getTransferById,
   updateTransfer,
 } = require('../controllers/transferController');
@@ -17,6 +18,7 @@ const router = express.Router();
 
 router.use(protect);
 router.get('/getAllTransfers', getAllTransfers);
+router.get('/days', getTransferDays);
 router.get('/get/:id', mongoIdParamValidation, getTransferById);
 router.post('/create', transferValidation, createTransfer);
 router.put('/update/:id', mongoIdParamValidation, transferUpdateValidation, updateTransfer);

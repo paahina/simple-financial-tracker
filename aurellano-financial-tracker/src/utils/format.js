@@ -55,3 +55,21 @@ export const dateInput = (value) => {
 };
 
 export const toIsoDate = (value) => `${value}T00:00:00.000Z`;
+
+export const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+export const localDayBoundsIso = (dateStr) => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const start = new Date(year, month - 1, day, 0, 0, 0, 0);
+  const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+  return { startDate: start.toISOString(), endDate: end.toISOString() };
+};
+
+export const formatDayKey = (dateStr) => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};

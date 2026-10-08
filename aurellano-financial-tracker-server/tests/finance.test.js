@@ -169,6 +169,26 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   assert.equal(report.body.dailyExpenses.data[0].categoryName, 'Food');
   assert.equal(report.body.dailyExpenses.data[0].amount, 25000);
 
+  const transactionDays = await request(app)
+    .get('/api/transactions/days?timezone=UTC&page=1&limit=10')
+    .set(auth(token));
+  assert.equal(transactionDays.status, 200);
+  assert.equal(transactionDays.body.total, 1);
+  assert.equal(transactionDays.body.data[0].count, 2);
+  assert.equal(transactionDays.body.data[0].totalAmount, 975000);
+
+  const transferDays = await request(app)
+    .get('/api/transfers/days?timezone=UTC&page=1&limit=10')
+    .set(auth(token));
+  assert.equal(transferDays.status, 200);
+  assert.equal(transferDays.body.data[0].count, 1);
+  assert.equal(transferDays.body.data[0].totalAmount, 200000);
+
+  const badZone = await request(app)
+    .get('/api/transactions/days?timezone=Not/AZone')
+    .set(auth(token));
+  assert.equal(badZone.status, 400);
+
   const other = await register('other@example.com');
   const hidden = await request(app)
     .get(`/api/accounts/get/${cash.body.account._id}`)
