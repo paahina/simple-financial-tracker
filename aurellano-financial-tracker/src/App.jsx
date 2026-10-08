@@ -13,6 +13,7 @@ import OverviewPage from './pages/AdminPages/OverviewPage';
 import SignInPage from './pages/AuthPages/SignInPage';
 import SignUpPage from './pages/AuthPages/SignUpPage';
 import NotFoundPage from './pages/NotFoundPage';
+import AccountCreatePage from './pages/UserPages/AccountCreatePage';
 import AccountEditPage from './pages/UserPages/AccountEditPage';
 import AccountsPage from './pages/UserPages/AccountsPage';
 import CategoriesPage from './pages/UserPages/CategoriesPage';
@@ -54,6 +55,7 @@ const router = createBrowserRouter([
         children: [
           { path: '/dashboard', element: <DashboardPage /> },
           { path: '/accounts', element: <AccountsPage /> },
+          { path: '/accounts/new', element: <AccountCreatePage /> },
           { path: '/accounts/:id/edit', element: <AccountEditPage /> },
           { path: '/categories', element: <CategoriesPage /> },
           { path: '/categories/new', element: <CategoryFormPage /> },

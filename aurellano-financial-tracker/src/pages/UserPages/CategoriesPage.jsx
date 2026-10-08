@@ -57,17 +57,23 @@ const CategoriesPage = () => {
       <ErrorText message={error} />
       {!categories && !error && <Loading variant="list" />}
       {categories?.length === 0 && <Empty label="No categories yet." />}
-      <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-neutral-0">
+      <ul className="space-y-3 lg:space-y-0 lg:divide-y lg:divide-neutral-200 lg:overflow-hidden lg:rounded-lg lg:border lg:border-neutral-200 lg:bg-neutral-0">
         {categories?.map((category) => (
-          <li key={category._id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-            <span>
-              {category.name}
-              <span className="ml-2 text-neutral-500">
-                {category.type}
-                {category.isActive ? '' : ' · inactive'}
-              </span>
-            </span>
-            <span className="flex items-center gap-2">
+          <li key={category._id} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4 text-sm lg:flex lg:items-center lg:justify-between lg:gap-3 lg:rounded-none lg:border-0 lg:px-4 lg:py-3">
+            <div className="min-w-0">
+              <div className="flex items-start justify-between gap-3 lg:block">
+                <span>
+                  {category.name}
+                  <span className="ml-2 hidden text-neutral-500 lg:inline">
+                    {category.type}
+                    {category.isActive ? '' : ' · inactive'}
+                  </span>
+                  {!category.isActive && <span className="mt-1 block text-neutral-500 lg:hidden">Inactive</span>}
+                </span>
+                <span className="shrink-0 text-neutral-500 lg:hidden">{category.type}</span>
+              </div>
+            </div>
+            <span className="mt-3 flex flex-wrap items-center gap-2 lg:mt-0">
               <EditLink to={`/categories/${category._id}/edit`}>Edit</EditLink>
               {category.isActive && (
                 <Button variant="warning" icon={CircleOff} onClick={() => onDeactivate(category._id)}>

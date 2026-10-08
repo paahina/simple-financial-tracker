@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button, { editLinkClass } from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
@@ -36,6 +36,7 @@ const TransactionCreatePage = () => {
   const [transactionDate, setTransactionDate] = useState(nowDatetimeLocal());
   const [drafts, setDrafts] = useState([blankRow()]);
   const [saving, setSaving] = useState(false);
+  const cardRowRef = useRef(null);
 
   useEffect(() => {
     Promise.all([getAccountsRequest(token), getCategoriesRequest(token)])
@@ -45,6 +46,12 @@ const TransactionCreatePage = () => {
       })
       .catch((err) => setError(err.message));
   }, [token]);
+
+  useEffect(() => {
+    const node = cardRowRef.current;
+    if (!node || window.matchMedia('(min-width: 1024px)').matches) return;
+    node.scrollTo({ left: node.scrollWidth, behavior: 'smooth' });
+  }, [drafts.length]);
 
   const updateDraft = (key, patch) => {
     setDrafts((rows) => rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -112,8 +119,83 @@ const TransactionCreatePage = () => {
             onChange={(event) => setTransactionDate(event.target.value)}
           />
         </Field>
-        <p className="text-sm text-neutral-500">Every row below is saved with this date and time.</p>
-        <div className="overflow-x-auto">
+        <p className="text-sm text-neutral-500">Every entry below is saved with this date and time.</p>
+        <div ref={cardRowRef} className="flex snap-x snap-mandatory overflow-x-auto lg:hidden">
+          {drafts.map((row, index) => {
+            const errors = fieldErrors[row.key] || {};
+            const matchingCategories = categories.filter((category) => category.type === row.type);
+            return (
+              <article key={row.key} className="min-w-full shrink-0 snap-start space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+                <p className="text-sm font-medium text-primary-shade">Entry {index + 1}</p>
+                <Field label="Account" error={errors.accountId}>
+                  <select
+                    className={inputClass}
+                    required
+                    value={row.accountId}
+                    onChange={(event) => updateDraft(row.key, { accountId: event.target.value })}
+                  >
+                    <option value="">Select</option>
+                    {accounts.map((account) => (
+                      <option key={account._id} value={account._id}>
+                        {account.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Type">
+                  <select
+                    className={inputClass}
+                    value={row.type}
+                    onChange={(event) => updateDraft(row.key, { type: event.target.value, categoryId: '' })}
+                  >
+                    <option value="EXPENSE">Expense</option>
+                    <option value="INCOME">Income</option>
+                  </select>
+                </Field>
+                <Field label="Category" error={errors.categoryId}>
+                  <select
+                    className={inputClass}
+                    required
+                    value={row.categoryId}
+                    onChange={(event) => updateDraft(row.key, { categoryId: event.target.value })}
+                  >
+                    <option value="">Select</option>
+                    {matchingCategories.map((category) => (
+                      <option key={category._id} value={category._id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Label" error={errors.label}>
+                  <input
+                    className={inputClass}
+                    required
+                    value={row.label}
+                    onChange={(event) => updateDraft(row.key, { label: event.target.value })}
+                  />
+                </Field>
+                <Field label="Amount (PHP)" error={errors.amount}>
+                  <input
+                    className={inputClass}
+                    required
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={row.amount}
+                    onChange={(event) => updateDraft(row.key, { amount: event.target.value })}
+                  />
+                </Field>
+                {drafts.length > 1 ? (
+                  <Button variant="ghost" onClick={() => setDrafts(drafts.filter((item) => item.key !== row.key))}>
+                    Remove
+                  </Button>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+        <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full border-collapse text-sm">
             <thead>
               <tr className="bg-primary text-left text-neutral-0">

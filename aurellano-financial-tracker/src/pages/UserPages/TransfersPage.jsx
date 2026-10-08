@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
 import DayGroupList from '../../components/DayGroupList';
+import DayListDrawer from '../../components/DayListDrawer';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
@@ -39,6 +40,7 @@ const TransfersPage = () => {
   const [selectedDay, setSelectedDay] = useState(null);
   const [entries, setEntries] = useState([]);
   const [dayLoading, setDayLoading] = useState(false);
+  const [daysOpen, setDaysOpen] = useState(false);
 
   useEffect(() => {
     getAccountsRequest(token)
@@ -124,6 +126,67 @@ const TransfersPage = () => {
       </div>
       <ErrorText message={error} />
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+        <div className="hidden lg:block">
+          <DayGroupList
+            days={days}
+            loading={loading}
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            selectedDate={selectedDay?.date}
+            emptyLabel="No transfers yet."
+            onSelect={setSelectedDay}
+            onPageChange={(nextPage, nextSize) => {
+              setPage(nextPage);
+              setPageSize(nextSize);
+            }}
+          />
+        </div>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <Button variant="ghost" className="lg:hidden" onClick={() => setDaysOpen(true)}>
+                Days
+              </Button>
+              <h2 className="truncate text-lg font-semibold text-primary-shade">
+                {selectedDay ? formatDayKey(selectedDay.date) : 'Entries'}
+              </h2>
+            </div>
+            <Link className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0 hover:bg-primary-shade" to="/transfers/new">
+              New transfer
+            </Link>
+          </div>
+          {dayLoading && <Loading variant="list" />}
+          {!dayLoading && selectedDay && entries.length === 0 && <Empty label="No entries on this day." />}
+          {!dayLoading && entries.length > 0 && (
+            <ul className="space-y-3 lg:space-y-0 lg:divide-y lg:divide-neutral-200 lg:overflow-hidden lg:rounded-lg lg:border lg:border-neutral-200 lg:bg-neutral-0">
+              {entries.map((item) => (
+                <li key={item._id} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4 text-sm lg:flex lg:items-center lg:justify-between lg:gap-3 lg:rounded-none lg:border-0 lg:px-4 lg:py-3">
+                  <div className="min-w-0">
+                    <div className="flex items-start justify-between gap-3 lg:block">
+                      <span>
+                        {sourceOf(item)} to {destinationOf(item)}
+                        <span className="mt-1 block text-neutral-500 lg:ml-2 lg:mt-0 lg:inline">
+                          {formatDateTime(item.transactionDate)}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-medium lg:hidden">{formatPeso(item.amount)}</span>
+                    </div>
+                  </div>
+                  <span className="mt-3 flex flex-wrap items-center gap-3 lg:mt-0">
+                    <span className="hidden lg:inline">{formatPeso(item.amount)}</span>
+                    <EditLink to={`/transfers/${item._id}/edit`}>Edit</EditLink>
+                    <Button variant="danger" icon={Trash2} onClick={() => onDelete(item._id)}>
+                      Delete
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+      <DayListDrawer open={daysOpen} onClose={() => setDaysOpen(false)}>
         <DayGroupList
           days={days}
           loading={loading}
@@ -138,38 +201,7 @@ const TransfersPage = () => {
             setPageSize(nextSize);
           }}
         />
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-primary-shade">
-              {selectedDay ? formatDayKey(selectedDay.date) : 'Entries'}
-            </h2>
-            <Link className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0 hover:bg-primary-shade" to="/transfers/new">
-              New transfer
-            </Link>
-          </div>
-          {dayLoading && <Loading variant="list" />}
-          {!dayLoading && selectedDay && entries.length === 0 && <Empty label="No entries on this day." />}
-          {!dayLoading && entries.length > 0 && (
-            <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-neutral-0">
-              {entries.map((item) => (
-                <li key={item._id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                  <span>
-                    {sourceOf(item)} to {destinationOf(item)}
-                    <span className="ml-2 text-neutral-500">{formatDateTime(item.transactionDate)}</span>
-                  </span>
-                  <span className="flex items-center gap-3">
-                    {formatPeso(item.amount)}
-                    <EditLink to={`/transfers/${item._id}/edit`}>Edit</EditLink>
-                    <Button variant="danger" icon={Trash2} onClick={() => onDelete(item._id)}>
-                      Delete
-                    </Button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
+      </DayListDrawer>
     </section>
   );
 };

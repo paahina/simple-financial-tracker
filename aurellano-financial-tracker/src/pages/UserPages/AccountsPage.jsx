@@ -1,26 +1,21 @@
 import { CircleOff } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
 import Money from '../../components/Money';
-import Field, { inputClass } from '../../components/Field';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
-import { createAccountRequest, deactivateAccountRequest, getAccountsRequest } from '../../services/api';
-import { toCentavos } from '../../utils/format';
-import { hasErrors, optionalAmount, requiredText } from '../../utils/validate';
-
-const emptyForm = { name: '', type: 'CASH', initialBalance: '', description: '' };
+import { deactivateAccountRequest, getAccountsRequest } from '../../services/api';
 
 const AccountsPage = () => {
   const { token } = useAuth();
+  const location = useLocation();
   const { notify } = useToast();
   const confirm = useConfirm();
   const [accounts, setAccounts] = useState(null);
-  const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState({});
 
   const load = useCallback(
     () =>
@@ -33,34 +28,6 @@ const AccountsPage = () => {
   useEffect(() => {
     load();
   }, [load]);
-
-  const onCreate = async (event) => {
-    event.preventDefault();
-    const nextErrors = {
-      name: requiredText(form.name, 'Name', 2),
-      initialBalance: optionalAmount(form.initialBalance, 'Current amount'),
-    };
-    setFieldErrors(nextErrors);
-    if (hasErrors(nextErrors)) return;
-    setError('');
-    try {
-      await createAccountRequest(
-        {
-          name: form.name,
-          type: form.type,
-          initialBalance: toCentavos(form.initialBalance || 0),
-          currency: 'PHP',
-          description: form.description,
-        },
-        token,
-      );
-      setForm(emptyForm);
-      notify('Account created');
-      await load();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
 
   const onDeactivate = async (id) => {
     const accepted = await confirm({
@@ -81,56 +48,38 @@ const AccountsPage = () => {
   };
 
   return (
-    <section className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-      <div>
-        <h1 className="mb-4 text-2xl font-semibold text-primary-shade">Accounts</h1>
-        <ErrorText message={error} />
-        {!accounts && !error && <Loading variant="list" />}
-        {accounts?.length === 0 && <Empty label="No accounts yet." />}
-        <ul className="space-y-3">
-          {accounts?.map((account) => (
-            <li key={account._id} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">{account.name}</p>
-                  <p className="text-sm text-neutral-500">
-                    {account.type}
-                    {account.isActive ? '' : ' · inactive'}
-                  </p>
-                  <Money className="mt-2 block text-primary-shade" centavos={account.balance} />
-                </div>
-                <span className="flex items-center gap-2">
-                  <EditLink className="text-sm" to={`/accounts/${account._id}/edit`}>
-                    Edit
-                  </EditLink>
-                  {account.isActive && (
-                    <Button variant="warning" icon={CircleOff} onClick={() => onDeactivate(account._id)}>
-                      Deactivate
-                    </Button>
-                  )}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
+    <section className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold text-primary-shade">Accounts</h1>
+        <Link className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0" to="/accounts/new" state={{ backgroundLocation: location }}>
+          New account
+        </Link>
       </div>
-      <form className="h-fit space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onCreate}>
-        <h2 className="text-lg text-primary">New account</h2>
-        <Field label="Name" error={fieldErrors.name}>
-          <input className={inputClass} required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-        </Field>
-        <Field label="Type">
-          <select className={inputClass} value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>
-            <option value="CASH">Cash</option>
-            <option value="E_WALLET">E-wallet</option>
-            <option value="BANK">Bank</option>
-          </select>
-        </Field>
-        <Field label="Current amount (PHP)" error={fieldErrors.initialBalance}>
-          <input className={inputClass} type="number" min="0" step="0.01" value={form.initialBalance} onChange={(event) => setForm({ ...form, initialBalance: event.target.value })} />
-        </Field>
-        <Button onClick={onCreate}>Save account</Button>
-      </form>
+      <ErrorText message={error} />
+      {!accounts && !error && <Loading variant="list" />}
+      {accounts?.length === 0 && <Empty label="No accounts yet." />}
+      <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {accounts?.map((account) => (
+          <li key={account._id} className="flex flex-col rounded-lg border border-neutral-200 bg-neutral-0 p-4">
+            <p className="font-medium">{account.name}</p>
+            <p className="text-sm text-neutral-500">
+              {account.type}
+              {account.isActive ? '' : ' · inactive'}
+            </p>
+            <Money className="mt-2 block text-primary-shade" centavos={account.balance} />
+            <span className="mt-3 flex flex-wrap items-center gap-2">
+              <EditLink className="text-sm" to={`/accounts/${account._id}/edit`}>
+                Edit
+              </EditLink>
+              {account.isActive && (
+                <Button variant="warning" icon={CircleOff} onClick={() => onDeactivate(account._id)}>
+                  Deactivate
+                </Button>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 };

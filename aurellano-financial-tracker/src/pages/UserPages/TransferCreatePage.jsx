@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button, { editLinkClass } from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
@@ -31,12 +31,19 @@ const TransferCreatePage = () => {
   const [transactionDate, setTransactionDate] = useState(nowDatetimeLocal());
   const [drafts, setDrafts] = useState([blankRow()]);
   const [saving, setSaving] = useState(false);
+  const cardRowRef = useRef(null);
 
   useEffect(() => {
     getAccountsRequest(token)
       .then((accountList) => setActiveAccounts(accountList.filter((account) => account.isActive)))
       .catch((err) => setError(err.message));
   }, [token]);
+
+  useEffect(() => {
+    const node = cardRowRef.current;
+    if (!node || window.matchMedia('(min-width: 1024px)').matches) return;
+    node.scrollTo({ left: node.scrollWidth, behavior: 'smooth' });
+  }, [drafts.length]);
 
   const updateDraft = (key, patch) => {
     setDrafts((rows) => rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -111,8 +118,88 @@ const TransferCreatePage = () => {
             onChange={(event) => setTransactionDate(event.target.value)}
           />
         </Field>
-        <p className="text-sm text-neutral-500">Every row below is saved with this date and time.</p>
-        <div className="overflow-x-auto">
+        <p className="text-sm text-neutral-500">Every entry below is saved with this date and time.</p>
+        <div ref={cardRowRef} className="flex snap-x snap-mandatory overflow-x-auto lg:hidden">
+          {drafts.map((row, index) => {
+            const errors = fieldErrors[row.key] || {};
+            return (
+              <article key={row.key} className="min-w-full shrink-0 snap-start space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+                <p className="text-sm font-medium text-primary-shade">Entry {index + 1}</p>
+                <Field label="From" error={errors.fromAccountId}>
+                  <select
+                    className={inputClass}
+                    required
+                    value={row.fromAccountId}
+                    onChange={(event) => updateDraft(row.key, { fromAccountId: event.target.value })}
+                  >
+                    <option value="">Select</option>
+                    {activeAccounts.map((account) => (
+                      <option key={account._id} value={account._id}>
+                        {account.name}
+                      </option>
+                    ))}
+                    <option value="other">From other</option>
+                  </select>
+                </Field>
+                {row.fromAccountId === 'other' ? (
+                  <Field label="Sender" error={errors.senderName}>
+                    <input
+                      className={inputClass}
+                      required
+                      minLength={2}
+                      value={row.senderName}
+                      onChange={(event) => updateDraft(row.key, { senderName: event.target.value })}
+                    />
+                  </Field>
+                ) : null}
+                <Field label="To" error={errors.toAccountId}>
+                  <select
+                    className={inputClass}
+                    required
+                    value={row.toAccountId}
+                    onChange={(event) => updateDraft(row.key, { toAccountId: event.target.value })}
+                  >
+                    <option value="">Select</option>
+                    {activeAccounts.map((account) => (
+                      <option key={account._id} value={account._id}>
+                        {account.name}
+                      </option>
+                    ))}
+                    <option value="other">To other</option>
+                  </select>
+                </Field>
+                {row.toAccountId === 'other' ? (
+                  <Field label="Recipient" error={errors.recipientName}>
+                    <input
+                      className={inputClass}
+                      required
+                      minLength={2}
+                      value={row.recipientName}
+                      onChange={(event) => updateDraft(row.key, { recipientName: event.target.value })}
+                    />
+                  </Field>
+                ) : null}
+                <Field label="Amount (PHP)" error={errors.amount}>
+                  <input
+                    className={inputClass}
+                    required
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={row.amount}
+                    onChange={(event) => updateDraft(row.key, { amount: event.target.value })}
+                  />
+                </Field>
+                {drafts.length > 1 ? (
+                  <Button variant="ghost" onClick={() => setDrafts(drafts.filter((item) => item.key !== row.key))}>
+                    Remove
+                  </Button>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+        <div className="hidden overflow-x-auto lg:block">
           <table className="min-w-full border-collapse text-sm">
             <thead>
               <tr className="bg-primary text-left text-neutral-0">

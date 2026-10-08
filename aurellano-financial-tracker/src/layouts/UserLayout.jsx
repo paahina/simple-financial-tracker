@@ -9,7 +9,7 @@ import TransfersPage from '../pages/UserPages/TransfersPage';
 
 const backgroundFor = (pathname, state) => {
   const from = state?.backgroundLocation?.pathname || '';
-  if (matchPath('/accounts/:id/edit', pathname)) return AccountsPage;
+  if (matchPath('/accounts/new', pathname) || matchPath('/accounts/:id/edit', pathname)) return AccountsPage;
   if (matchPath('/categories/new', pathname) || matchPath('/categories/:id/edit', pathname)) return CategoriesPage;
   if (matchPath('/transactions/:id/edit', pathname)) return TransactionsPage;
   if (matchPath('/transfers/:id/edit', pathname)) return TransfersPage;
@@ -28,7 +28,7 @@ const UserLayout = () => {
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900">
       <Navbar />
-      <main className="mx-auto max-w-6xl px-4 pb-8 pt-40 md:pt-24">
+      <main className="mx-auto max-w-6xl px-4 pb-8 pt-20">
         {Background ? <Background /> : <Outlet />}
       </main>
       {Background ? <Outlet /> : null}
