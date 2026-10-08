@@ -3,6 +3,7 @@ services:
     name: aurellano-financial-tracker-api
     runtime: node
     plan: free
+    rootDir: aurellano-financial-tracker-server
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /
