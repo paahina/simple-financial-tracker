@@ -190,7 +190,8 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   assert.equal(transactionDays.status, 200);
   assert.equal(transactionDays.body.total, 1);
   assert.equal(transactionDays.body.data[0].count, 2);
-  assert.equal(transactionDays.body.data[0].totalAmount, 975000);
+  assert.equal(transactionDays.body.data[0].addedAmount, 1000000);
+  assert.equal(transactionDays.body.data[0].deductedAmount, 25000);
 
   const transferDays = await request(app)
     .get('/api/transfers/days?timezone=UTC&page=1&limit=10')

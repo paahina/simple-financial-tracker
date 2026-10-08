@@ -23,7 +23,7 @@ const getTransactionDays = async (req, res) => {
       Transaction,
       { userId: new Types.ObjectId(req.user.id) },
       req.query,
-      { signed: true },
+      { kind: 'transaction' },
     );
     res.status(HttpStatus.OK).json(body);
   } catch (error) {

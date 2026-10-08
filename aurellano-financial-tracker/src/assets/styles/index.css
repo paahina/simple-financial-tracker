@@ -14,6 +14,9 @@
   --color-warning: var(--warning);
   --color-destructive: var(--destructive);
   --color-destructive-shade: var(--destructive-shade);
+  --color-destructive-tint: var(--destructive-tint);
+  --color-success: var(--success);
+  --color-success-tint: var(--success-tint);
   --font-sans: 'Segoe UI', sans-serif;
 }
 

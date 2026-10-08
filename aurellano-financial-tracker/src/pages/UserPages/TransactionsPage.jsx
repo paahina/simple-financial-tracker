@@ -2,9 +2,8 @@ import { Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
-import DayEntriesModal from '../../components/DayEntriesModal';
 import DayGroupList from '../../components/DayGroupList';
-import { ErrorText } from '../../components/StatusMessage';
+import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
@@ -54,6 +53,13 @@ const TransactionsPage = () => {
     load();
   }, [load]);
 
+  useEffect(() => {
+    setSelectedDay((current) => {
+      if (!days.length) return null;
+      return days.find((day) => day.date === current?.date) || days[0];
+    });
+  }, [days]);
+
   const loadEntries = useCallback(
     (date) => {
       setDayLoading(true);
@@ -83,16 +89,12 @@ const TransactionsPage = () => {
       await deleteTransactionRequest(id, token);
       notify('Transaction deleted');
       const remaining = entries.filter((item) => item._id !== id);
-      if (!remaining.length) {
-        setSelectedDay(null);
+      if (!remaining.length && days.length === 1 && page > 0) {
         setEntries([]);
-        if (days.length === 1 && page > 0) {
-          setPage((current) => current - 1);
-          return;
-        }
-      } else {
-        setEntries(remaining);
+        setPage((current) => current - 1);
+        return;
       }
+      setEntries(remaining);
       await load();
     } catch (err) {
       setError(err.message);
@@ -101,54 +103,57 @@ const TransactionsPage = () => {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-primary-shade">Transactions</h1>
-        <Link className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0 hover:bg-primary-shade" to="/transactions/new">
-          New transaction
-        </Link>
-      </div>
+      <h1 className="text-2xl font-semibold text-primary-shade">Transactions</h1>
       <ErrorText message={error} />
-      <DayGroupList
-        days={days}
-        loading={loading}
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        amountLabel="Net"
-        emptyLabel="No income or expenses yet."
-        onOpen={setSelectedDay}
-        onPageChange={(nextPage, nextSize) => {
-          setPage(nextPage);
-          setPageSize(nextSize);
-        }}
-      />
-      {selectedDay && (
-        <DayEntriesModal
-          title={formatDayKey(selectedDay.date)}
-          loading={dayLoading}
-          onClose={() => setSelectedDay(null)}
-        >
-          <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200">
-            {entries.map((item) => (
-              <li key={item._id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                <span>
-                  {item.label}
-                  <span className="ml-2 text-neutral-500">
-                    {item.type} · {formatDateTime(item.transactionDate)}
+      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+        <DayGroupList
+          days={days}
+          loading={loading}
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          selectedDate={selectedDay?.date}
+          emptyLabel="No income or expenses yet."
+          onSelect={setSelectedDay}
+          onPageChange={(nextPage, nextSize) => {
+            setPage(nextPage);
+            setPageSize(nextSize);
+          }}
+        />
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-primary-shade">
+              {selectedDay ? formatDayKey(selectedDay.date) : 'Entries'}
+            </h2>
+            <Link className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0 hover:bg-primary-shade" to="/transactions/new">
+              New transaction
+            </Link>
+          </div>
+          {dayLoading && <Loading variant="list" />}
+          {!dayLoading && selectedDay && entries.length === 0 && <Empty label="No entries on this day." />}
+          {!dayLoading && entries.length > 0 && (
+            <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-neutral-0">
+              {entries.map((item) => (
+                <li key={item._id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                  <span>
+                    {item.label}
+                    <span className="ml-2 text-neutral-500">
+                      {item.type} · {formatDateTime(item.transactionDate)}
+                    </span>
                   </span>
-                </span>
-                <span className="flex items-center gap-3">
-                  {formatPeso(item.amount)}
-                  <EditLink to={`/transactions/${item._id}/edit`}>Edit</EditLink>
-                  <Button variant="danger" icon={Trash2} onClick={() => onDelete(item._id)}>
-                    Delete
-                  </Button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </DayEntriesModal>
-      )}
+                  <span className="flex items-center gap-3">
+                    {formatPeso(item.amount)}
+                    <EditLink to={`/transactions/${item._id}/edit`}>Edit</EditLink>
+                    <Button variant="danger" icon={Trash2} onClick={() => onDelete(item._id)}>
+                      Delete
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </section>
   );
 };

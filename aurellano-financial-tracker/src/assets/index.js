@@ -12,6 +12,9 @@ export const colors = {
   warning: '#D97706',
   destructive: '#DC2626',
   destructiveShade: '#B91C1C',
+  destructiveTint: '#FEE2E2',
+  success: '#15803D',
+  successTint: '#DCFCE7',
 };
 
 const cssVariables = {
@@ -28,6 +31,9 @@ const cssVariables = {
   '--warning': colors.warning,
   '--destructive': colors.destructive,
   '--destructive-shade': colors.destructiveShade,
+  '--destructive-tint': colors.destructiveTint,
+  '--success': colors.success,
+  '--success-tint': colors.successTint,
 };
 
 export function applyTheme(target = document.documentElement) {

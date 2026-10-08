@@ -13,19 +13,35 @@ const resolveTimeZone = (value) => {
   }
 };
 
-const listActivityDays = async (Model, filter, query, { signed = false } = {}) => {
+const amountSums = (kind) => {
+  if (kind === 'transaction') {
+    return {
+      addedAmount: { $sum: { $cond: [{ $eq: ['$type', 'INCOME'] }, '$amount', 0] } },
+      deductedAmount: { $sum: { $cond: [{ $eq: ['$type', 'EXPENSE'] }, '$amount', 0] } },
+    };
+  }
+  if (kind === 'transfer') {
+    return {
+      addedAmount: { $sum: { $cond: [{ $ifNull: ['$toAccountId', false] }, '$amount', 0] } },
+      deductedAmount: { $sum: { $cond: [{ $ifNull: ['$fromAccountId', false] }, '$amount', 0] } },
+    };
+  }
+  return {
+    addedAmount: { $sum: '$amount' },
+    deductedAmount: { $sum: 0 },
+  };
+};
+
+const listActivityDays = async (Model, filter, query, { kind = 'transaction' } = {}) => {
   const timezone = resolveTimeZone(query.timezone);
   const { page, limit, skip } = parsePagination(query);
-  const amount = signed
-    ? { $cond: [{ $eq: ['$type', 'EXPENSE'] }, { $multiply: ['$amount', -1] }, '$amount'] }
-    : '$amount';
   const [result] = await Model.aggregate([
     { $match: filter },
     {
       $group: {
         _id: { $dateToString: { format: '%Y-%m-%d', date: '$transactionDate', timezone } },
         count: { $sum: 1 },
-        totalAmount: { $sum: amount },
+        ...amountSums(kind),
       },
     },
     { $sort: { _id: -1 } },
@@ -40,7 +56,8 @@ const listActivityDays = async (Model, filter, query, { signed = false } = {}) =
   const data = (result?.data || []).map((row) => ({
     date: row._id,
     count: row.count,
-    totalAmount: row.totalAmount,
+    addedAmount: row.addedAmount,
+    deductedAmount: row.deductedAmount,
   }));
   return paginatedResponse({ data, total, page, limit });
 };

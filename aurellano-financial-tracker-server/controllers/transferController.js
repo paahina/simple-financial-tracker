@@ -42,6 +42,7 @@ const getTransferDays = async (req, res) => {
       Transfer,
       { userId: new Types.ObjectId(req.user.id) },
       req.query,
+      { kind: 'transfer' },
     );
     res.status(HttpStatus.OK).json(body);
   } catch (error) {
