@@ -1,5 +1,5 @@
 const Tabs = ({ tabs, value, onChange }) => (
-  <div className="flex gap-6 border-b border-neutral-200" role="tablist">
+  <div className="flex flex-wrap gap-x-6 border-b border-neutral-200" role="tablist">
     {tabs.map((tab) => {
       const selected = tab.id === value;
       return (

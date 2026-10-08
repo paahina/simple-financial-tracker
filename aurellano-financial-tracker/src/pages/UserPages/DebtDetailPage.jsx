@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import Button, { EditLink, editLinkClass } from '../../components/Button';
+import StatusChip from '../../components/StatusChip';
 import Tabs from '../../components/Tabs';
 import Pager from '../../components/Pager';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
@@ -115,8 +116,9 @@ const DebtDetailPage = () => {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-primary-shade">{debt.personName}</h1>
-          <p className="text-sm text-neutral-500">
-            {debt.status} · {debt.dueDate ? `due ${formatDate(debt.dueDate)}` : 'No due date'}
+          <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-500">
+            <StatusChip status={debt.status} />
+            <span>{debt.dueDate ? `due ${formatDate(debt.dueDate)}` : 'No due date'}</span>
           </p>
           {debt.description?.trim() ? <p className="mt-2 font-semibold text-primary">{debt.description}</p> : null}
           <p className="mt-2">

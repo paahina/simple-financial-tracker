@@ -2,7 +2,7 @@ const Debt = require('../models/debtModel');
 const DebtPayment = require('../models/debtPaymentModel');
 const Account = require('../models/accountModel');
 const { HttpStatus } = require('../config/constants');
-const { isPaged, parsePagination, paginatedResponse, slicePage } = require('../utils/pagination');
+const { isPaged, slicePage } = require('../utils/pagination');
 const {
   FinanceError,
   debtState,
@@ -38,33 +38,40 @@ const requireDebt = async (userId, debtId) => {
 
 const refreshStatus = async (debt) => presentDebt(debt);
 
+const emptyStatusCounts = () => ({
+  PENDING: 0,
+  PARTIALLY_PAID: 0,
+  PAID: 0,
+  OVERDUE: 0,
+});
+
+const statusCounts = (debts) => {
+  const counts = emptyStatusCounts();
+  debts.forEach((debt) => {
+    if (counts[debt.status] !== undefined) counts[debt.status] += 1;
+  });
+  return counts;
+};
+
 const getAllDebts = async (req, res) => {
   try {
     const filter = { userId: req.user.id };
-    const sort = { dueDate: 1 };
+    const debts = await Debt.find(filter).sort({ dueDate: 1 });
+    const presented = await Promise.all(debts.map(presentDebt));
     if (!isPaged(req.query)) {
-      const debts = await Debt.find(filter).sort(sort);
-      const presented = await Promise.all(debts.map(presentDebt));
       const filtered = req.query.status
         ? presented.filter((debt) => debt.status === req.query.status)
         : presented;
       res.status(HttpStatus.OK).json(filtered);
       return;
     }
-    const { page, limit, skip } = parsePagination(req.query);
-    if (req.query.status) {
-      const debts = await Debt.find(filter).sort(sort);
-      const presented = await Promise.all(debts.map(presentDebt));
-      const filtered = presented.filter((debt) => debt.status === req.query.status);
-      res.status(HttpStatus.OK).json(slicePage(filtered, req.query));
-      return;
-    }
-    const [total, debts] = await Promise.all([
-      Debt.countDocuments(filter),
-      Debt.find(filter).sort(sort).skip(skip).limit(limit),
-    ]);
-    const data = await Promise.all(debts.map(presentDebt));
-    res.status(HttpStatus.OK).json(paginatedResponse({ data, total, page, limit }));
+    const filtered = req.query.status
+      ? presented.filter((debt) => debt.status === req.query.status)
+      : presented;
+    res.status(HttpStatus.OK).json({
+      ...slicePage(filtered, req.query),
+      counts: statusCounts(presented),
+    });
   } catch (error) {
     sendFinanceError(res, error);
   }
