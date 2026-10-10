@@ -18,19 +18,19 @@ A1. Fix session bootstrap leaving loading stuck
     Problem: User returns after a while, sees loading; reload may send them
     to login without using Log out.
     Tasks:
-    [ ] In AuthContext, ensure loading always clears in session check finally
+    [x] In AuthContext, ensure loading always clears in session check finally
         (even when effect cleanup runs — avoid abandoned request leaving
         loading true forever).
-    [ ] Add fetch timeout or AbortController for sessionRequest so cold API
+    [x] Add fetch timeout or AbortController for sessionRequest so cold API
         does not hang indefinitely.
-    [ ] On session failure, distinguish 401 (clear token, sign in) vs network
+    [x] On session failure, distinguish 401 (clear token, sign in) vs network
         / 5xx (show retry, optional keep token).
     Files: aurellano-financial-tracker/src/context/AuthContext.jsx,
            aurellano-financial-tracker/src/services/api.js (optional)
     QA: Token in localStorage, slow/offline API, expired JWT, normal return.
 
 A2. Document JWT_EXPIRES_IN for deploy
-    [ ] Note in README that session length follows JWT_EXPIRES_IN (default 7d).
+    [x] Note in README that session length follows JWT_EXPIRES_IN (default 7d).
     Files: README.md, server .env.example (comment only if needed).
 
 ----------------------------------------------------------------------
