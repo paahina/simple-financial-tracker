@@ -107,7 +107,7 @@ const PaymentEditPage = () => {
       <Field label="Notes">
         <input className={inputClass} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
       </Field>
-      <Button onClick={onSubmit}>Save changes</Button>
+      <Button type="submit">Save changes</Button>
     </form>
       )}
     </FormModal>

@@ -97,7 +97,7 @@ const DebtPaymentCreatePage = () => {
               onChange={(event) => setForm({ ...form, paymentDate: event.target.value })}
             />
           </Field>
-          <Button variant="tint" onClick={onSubmit}>
+          <Button variant="tint" type="submit">
             Record payment
           </Button>
         </form>

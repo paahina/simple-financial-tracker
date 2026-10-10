@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import BusyDialog from './components/BusyDialog';
 import GuestRoute from './components/GuestRoute';
 import ProtectedRoute from './components/ProtectedRoute';
 import Toast from './components/Toast';
@@ -103,6 +104,7 @@ const App = () => (
       <ConfirmProvider>
         <PrivacyProvider>
           <Toast />
+          <BusyDialog />
           <RouterProvider router={router} />
         </PrivacyProvider>
       </ConfirmProvider>

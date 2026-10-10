@@ -136,7 +136,7 @@ const AccountEditPage = () => {
         <input className={inputClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
       </Field>
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={onSubmit}>Save changes</Button>
+        <Button type="submit">Save changes</Button>
         <Button variant="danger" icon={Trash2} onClick={onDelete}>
           Delete
         </Button>

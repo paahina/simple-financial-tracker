@@ -85,7 +85,7 @@ const DebtAdditionCreatePage = () => {
             onChange={(event) => setForm({ ...form, createdAt: event.target.value })}
           />
         </Field>
-        <Button onClick={onSubmit}>Save amount</Button>
+        <Button type="submit">Save amount</Button>
       </form>
     </FormModal>
   );

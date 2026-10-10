@@ -275,7 +275,7 @@ const TransactionCreatePage = () => {
           >
             Add another
           </Button>
-          <Button onClick={onSaveAll} disabled={saving}>
+          <Button type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Save all'}
           </Button>
         </div>

@@ -48,7 +48,7 @@ const SignInPage = () => {
         />
       </Field>
       <ErrorText message={error} />
-      <Button className="w-full" variant="primary" disabled={submitting} onClick={onSubmit}>
+      <Button className="w-full" variant="primary" disabled={submitting} type="submit">
         {submitting ? 'Signing in...' : 'Sign in'}
       </Button>
       <p className="text-sm text-neutral-500">

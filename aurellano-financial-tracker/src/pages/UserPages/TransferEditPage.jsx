@@ -145,7 +145,7 @@ const TransferEditPage = () => {
       <Field label="Date and time" error={fieldErrors.transactionDate}>
         <input className={inputClass} required type="datetime-local" value={form.transactionDate} onChange={(event) => setForm({ ...form, transactionDate: event.target.value })} />
       </Field>
-      <Button onClick={onSubmit}>Save changes</Button>
+      <Button type="submit">Save changes</Button>
     </form>
       )}
     </FormModal>

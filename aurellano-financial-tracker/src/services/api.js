@@ -27,19 +27,41 @@ const parseResponse = async (response) => {
   return data;
 };
 
+const busyListeners = new Set();
+
+export const subscribeBusy = (listener) => {
+  busyListeners.add(listener);
+  return () => busyListeners.delete(listener);
+};
+
+const notifyBusy = (delta) => {
+  busyListeners.forEach((listener) => listener(delta));
+};
+
+const tracksBusy = (path, method) =>
+  method !== 'GET' &&
+  method !== 'HEAD' &&
+  path !== '/api/users/login' &&
+  path !== '/api/users/register';
+
 export const apiRequest = async (path, { method = 'GET', body, token, signal } = {}) => {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
+  const track = tracksBusy(path, method);
+  if (track) notifyBusy(1);
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    signal,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-
-  return parseResponse(response);
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      signal,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    return await parseResponse(response);
+  } finally {
+    if (track) notifyBusy(-1);
+  }
 };
 
 export const loginRequest = (credentials) =>

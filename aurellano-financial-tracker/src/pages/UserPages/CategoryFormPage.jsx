@@ -93,7 +93,7 @@ const CategoryFormPage = () => {
           Active
         </label>
       )}
-      <Button onClick={onSubmit}>{editing ? 'Save changes' : 'Create category'}</Button>
+      <Button type="submit">{editing ? 'Save changes' : 'Create category'}</Button>
     </form>
       )}
     </FormModal>

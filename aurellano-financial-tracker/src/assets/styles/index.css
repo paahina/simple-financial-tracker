@@ -28,3 +28,17 @@ body {
   color: var(--neutral-900);
   font-family: var(--font-sans);
 }
+
+@keyframes icon-wiggle {
+  0%,
+  100% {
+    transform: rotate(-14deg);
+  }
+  50% {
+    transform: rotate(14deg);
+  }
+}
+
+.icon-wiggle {
+  animation: icon-wiggle 0.7s ease-in-out infinite;
+}

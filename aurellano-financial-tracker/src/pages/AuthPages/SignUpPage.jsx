@@ -58,7 +58,7 @@ const SignUpPage = () => {
         />
       </Field>
       <ErrorText message={error} />
-      <Button className="w-full" disabled={submitting} onClick={onSubmit}>
+      <Button className="w-full" disabled={submitting} type="submit">
         {submitting ? 'Creating...' : 'Create account'}
       </Button>
       <p className="text-sm text-neutral-500">

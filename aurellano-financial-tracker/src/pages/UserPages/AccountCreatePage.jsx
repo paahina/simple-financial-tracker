@@ -104,7 +104,7 @@ const AccountCreatePage = () => {
         {belowRemainingBalance(toCentavos(form.initialBalance || 0), remainingCentavos(form.remainingBalance)) && (
           <BelowRemainingChip />
         )}
-        <Button onClick={onSubmit}>Save account</Button>
+        <Button type="submit">Save account</Button>
       </form>
     </FormModal>
   );

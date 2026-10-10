@@ -90,7 +90,7 @@ const DebtEditPage = () => {
       <Field label="Description">
         <input className={inputClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
       </Field>
-      <Button onClick={onSubmit}>Save changes</Button>
+      <Button type="submit">Save changes</Button>
     </form>
       )}
     </FormModal>
