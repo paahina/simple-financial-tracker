@@ -1,0 +1,153 @@
+SIMPLE FINANCIAL TRACKER
+Implementation Tasks (Backlog from recent planning)
+===================================================
+
+Location: docs/backlog/ — working file; may be updated or overridden.
+
+This file tracks agreed work not yet fully implemented or worth verifying.
+Completed UI work (tabs, pagination, debt status, skeletons, favicon, etc.)
+is assumed shipped unless a task says otherwise.
+
+Use checkboxes when executing: [ ] todo  [x] done
+
+----------------------------------------------------------------------
+PRIORITY A — Session / auth reliability
+----------------------------------------------------------------------
+
+A1. Fix session bootstrap leaving loading stuck
+    Problem: User returns after a while, sees loading; reload may send them
+    to login without using Log out.
+    Tasks:
+    [ ] In AuthContext, ensure loading always clears in session check finally
+        (even when effect cleanup runs — avoid abandoned request leaving
+        loading true forever).
+    [ ] Add fetch timeout or AbortController for sessionRequest so cold API
+        does not hang indefinitely.
+    [ ] On session failure, distinguish 401 (clear token, sign in) vs network
+        / 5xx (show retry, optional keep token).
+    Files: aurellano-financial-tracker/src/context/AuthContext.jsx,
+           aurellano-financial-tracker/src/services/api.js (optional)
+    QA: Token in localStorage, slow/offline API, expired JWT, normal return.
+
+A2. Document JWT_EXPIRES_IN for deploy
+    [ ] Note in README that session length follows JWT_EXPIRES_IN (default 7d).
+    Files: README.md, server .env.example (comment only if needed).
+
+----------------------------------------------------------------------
+PRIORITY B — Accounts: Active / Deactivated tabs
+----------------------------------------------------------------------
+
+B1. Accounts page tabs (like Debts status tabs)
+    [ ] Tabs: Active (default), Deactivated.
+    [ ] URL: ?tab=deactivated (Active has no query or ?tab=active).
+    [ ] Server: paged getAllAccounts supports isActive filter OR client filter
+        with correct total counts for each tab (prefer server filter + counts).
+    [ ] Skeleton on tab switch when a new request runs.
+    Files: AccountsPage.jsx, accountController.js, api.js, tests if shape changes.
+
+B2. Deactivated accounts excluded from money forms
+    Server already blocks inactive on transaction/transfer/payment writes.
+    [ ] Dropdowns: getAccountsRequest for create/edit transaction, transfer,
+        debt payment — only isActive true (query param or client filter on
+        unpaginated list).
+    [ ] Edit forms loading inactive account for old records: still show
+        selected account if editing historical row (read-only label or allow
+        display but block change to inactive for new picks).
+    Files: TransactionCreate/Edit, TransferCreate/Edit, DebtPayment pages,
+           optional GET /getAllAccounts?activeOnly=true.
+
+B3. Optional / zero balance on create and edit
+    Verify (mostly implemented):
+    [ ] Create: empty current amount -> 0 centavos (optionalAmount, min 0).
+    [ ] Edit: same; reject negative only.
+    [ ] No HTML min="0.01" on account amount fields.
+    QA: Create account with 0; edit to 0; negative rejected.
+
+B4. Reactivate account (optional follow-up)
+    Not in original deactivate-only scope.
+    [ ] If product wants Deactivated tab actions: PUT reactivate isActive true
+        with rules (no duplicate names, etc.).
+
+----------------------------------------------------------------------
+PRIORITY C — Debt description UX (partially done)
+----------------------------------------------------------------------
+
+C1. Show description on debt card and detail — DONE (verify in QA).
+
+C2. Description on New debt form
+    [ ] Add optional Description field to DebtCreatePage; send description in
+        createDebtRequest body (server already accepts).
+    Files: DebtCreatePage.jsx
+
+----------------------------------------------------------------------
+PRIORITY D — Transaction type chips
+----------------------------------------------------------------------
+
+D1. Shared TransactionTypeChip (or extend chip pattern)
+    [ ] INCOME: blue tint (use edit / new income tokens in theme if needed).
+    [ ] EXPENSE: orange/warning tint.
+    Files: new component, assets/index.js + index.css @theme if new tokens.
+
+D2. Use chips in UI
+    [ ] Transactions day list (card + desktop row): replace plain EXPENSE/INCOME text.
+    [ ] Optional: TransferCreate/TransactionCreate type Select — chip-like labels
+        in dropdown options or helper text (minimum: list views).
+
+----------------------------------------------------------------------
+PRIORITY E — Caching (client + Redis + MongoDB)
+----------------------------------------------------------------------
+
+See docs/15_caching_rules.txt for full rules.
+
+E1. Infrastructure
+    [ ] Add REDIS_URL to server .env.example; connect in server bootstrap.
+    [ ] npm install redis in aurellano-financial-tracker-server.
+    [ ] Helper: getCache(key), setCache(key, value, ttlSec), delPattern or
+        delKeys for user:{userId}:resource:*.
+    [ ] If REDIS_URL missing, no-op cache (direct Mongo).
+
+E2. Server cache layer (phase 1 — high value reads)
+    [ ] Wrap getDashboard with cache + invalidation on transaction/transfer/
+        debt payment / account mutations.
+    [ ] Wrap paginated getAllAccounts, getAllDebts (with status), categories list.
+    [ ] TTL 300s; invalidate on writes per 15_caching_rules.txt.
+
+E3. Client cache layer
+    [ ] Add TanStack Query (or agreed library).
+    [ ] Replace ad-hoc useEffect fetches on main list pages with useQuery;
+        staleTime 5m; invalidateQueries on mutations.
+    [ ] Keep dropdown unpaginated fetches on separate keys; invalidate with lists.
+
+E4. Tests
+    [ ] Finance tests still pass without Redis (fallback).
+    [ ] Optional: integration test with mock Redis or skip if no REDIS_URL in CI.
+
+----------------------------------------------------------------------
+PRIORITY F — Already discussed / verify only
+----------------------------------------------------------------------
+
+F1. Debts status tabs + skeleton on switch — implemented; QA.
+F2. Dashboard / Reports tabs + skeleton where request fires — QA.
+F3. Server-side pagination on lists — implemented; QA.
+F4. Piggy favicon + navbar logo — implemented; QA.
+
+----------------------------------------------------------------------
+Suggested implementation order
+----------------------------------------------------------------------
+
+1. A1 (session loading) — user-facing bug
+2. B1 + B2 (account tabs + active dropdowns)
+3. C2 + D1/D2 (debt create description + transaction chips)
+4. E1 → E3 (caching in phases)
+5. B4, E4 as needed
+
+----------------------------------------------------------------------
+Commit grouping (suggested, not mandatory)
+----------------------------------------------------------------------
+
+- fix: session bootstrap loading and auth errors
+- feat: active and deactivated account tabs
+- feat: transaction type chips
+- feat: optional debt description on create
+- feat: add Redis and read-through cache with invalidation
+- feat: client query cache with five-minute stale time

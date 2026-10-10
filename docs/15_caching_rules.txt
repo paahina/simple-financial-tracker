@@ -1,0 +1,127 @@
+SIMPLE FINANCIAL TRACKER
+Caching Rules (Planned Implementation)
+======================================
+
+Purpose
+-------
+Speed up reads and reduce MongoDB load while keeping money data correct.
+MongoDB remains the source of truth. Caches hold copies only.
+
+Read path (three tiers)
+-----------------------
+1. Client cache (browser)
+   - First check: in-memory cache (planned: TanStack Query or equivalent).
+   - Hit: use cached data (optionally revalidate in background after staleTime).
+   - Miss: HTTP request to the API.
+
+2. Server cache (Redis)
+   - API checks Redis before MongoDB.
+   - Hit: return cached JSON (or serialized payload).
+   - Miss: query MongoDB, store in Redis with TTL, return response.
+
+3. Client stores the API response for reuse until stale or invalidated.
+
+Flow summary
+------------
+  Client hit?     -> yes -> done
+  Client miss     -> Server (Redis) hit? -> yes -> store on client -> done
+  Server miss     -> Database -> store Redis -> store client -> done
+
+TTL and invalidation (both required)
+------------------------------------
+- TTL alone is NOT sufficient for a money app.
+- Default read TTL: 5 minutes (300 seconds) on client staleTime and Redis EXPIRE.
+- Write-time invalidation: on every create/update/delete that affects cached
+  data, clear matching client query keys AND delete matching Redis keys
+  immediately so the next read is fresh.
+
+Rule: invalidation gives accuracy after changes; TTL is a safety net for
+missed keys and idle entries.
+
+What to cache
+-------------
+Good candidates (per-user, read-heavy):
+- Account lists (paginated and full-list for dropdowns when keyed separately)
+- Category lists
+- Debt lists and status counts
+- Transaction/transfer day lists and paginated day entries
+- Dashboard aggregates (totalMoney, monthly totals, account balance page)
+- Monthly/yearly report slices (income/expense totals, category breakdowns)
+
+Cache lightly or not at all:
+- Single-record fetches used immediately before edit (prefer fresh or invalidate on open)
+- Auth session (/api/users/session) — do not cache as ledger data
+- Admin-sensitive reads unless explicitly designed
+
+Do not treat cache as balance storage
+-------------------------------------
+Balances are derived from transactions, transfers, and debt payments.
+If a cached response includes balances or totals, invalidate when ANY write
+touches:
+- transactions
+- transfers
+- debt payments
+- debt additions (amount owed)
+- account create/update that changes initialBalance / current amount
+- account deactivation (if it affects dropdowns or dashboard active totals)
+
+Redis key conventions
+---------------------
+- Always scope by user: user:{userId}:...
+- Include resource and query shape in the key, e.g.:
+    user:{userId}:accounts:page:1:limit:10
+    user:{userId}:accounts:all
+    user:{userId}:dashboard
+    user:{userId}:transactions:days:page:1:limit:10:tz:Asia/Manila
+- Use a consistent prefix for bulk invalidation, e.g. delete by pattern
+  user:{userId}:accounts:* after account mutation (use SCAN in production,
+  not KEYS on large datasets).
+
+Client cache conventions (planned)
+----------------------------------
+- Query keys mirror API intent: ['accounts', { page, limit }], ['debts', { status, page }]
+- staleTime: 5 * 60 * 1000 (5 minutes)
+- gcTime: longer than staleTime (e.g. 30 minutes) for back-navigation UX
+- After any successful mutation, invalidateQueries for affected families
+  (accounts, transactions, dashboard, reports, debts, etc.)
+
+Server implementation notes
+---------------------------
+- Node package: official `redis` (node-redis) client — npm library is free;
+  Redis server is a separate process (local Docker, or managed e.g. Upstash).
+- Env: REDIS_URL (optional). If unset, skip Redis layer and read MongoDB only
+  (dev-friendly fallback).
+- Serialize JSON responses; store the same shape the API would return.
+- On Redis connection failure: log and fall through to MongoDB (degrade, do not
+  fail reads unless policy says otherwise).
+
+Writes
+------
+- Order: commit to MongoDB first, then invalidate Redis keys, then client
+  invalidation happens on the client after successful API response.
+- Do not cache POST/PUT/DELETE responses as list replacements without
+  invalidating list keys.
+
+Dropdown full lists
+-------------------
+- Unpaginated getAllAccounts / getAllCategories / getAllDebts (no page query)
+  may use the same TTL + invalidation rules.
+- Dropdowns for transactions/transfers must use active accounts only;
+  invalidation runs when accounts are created, updated, or deactivated.
+
+Security
+--------
+- Never share cache keys across users.
+- Do not put JWT or passwords in Redis keys or cached bodies.
+
+Out of scope for first caching pass
+-----------------------------------
+- CDN caching of API responses
+- Caching across multiple API server instances without shared Redis
+- Long-lived cache without invalidation on writes
+
+Related docs
+------------
+- 04_architecture.txt
+- 09_business_rules.txt
+- backlog/implementation_tasks.txt
