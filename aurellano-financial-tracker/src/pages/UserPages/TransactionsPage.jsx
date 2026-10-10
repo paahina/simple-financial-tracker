@@ -6,6 +6,7 @@ import DayGroupList from '../../components/DayGroupList';
 import DayListDrawer from '../../components/DayListDrawer';
 import Pager from '../../components/Pager';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
+import TransactionTypeChip from '../../components/TransactionTypeChip';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
@@ -156,8 +157,9 @@ const TransactionsPage = () => {
                     <div className="flex items-start justify-between gap-3 lg:block">
                       <span>
                         {item.label}
-                        <span className="mt-1 block text-neutral-500 lg:ml-2 lg:mt-0 lg:inline">
-                          {item.type} · {formatDateTime(item.transactionDate)}
+                        <span className="mt-1 flex flex-wrap items-center gap-2 text-neutral-500 lg:ml-2 lg:mt-0 lg:inline-flex">
+                          <TransactionTypeChip type={item.type} />
+                          <span>{formatDateTime(item.transactionDate)}</span>
                         </span>
                       </span>
                       <span className="shrink-0 font-medium lg:hidden">{formatPeso(item.amount)}</span>

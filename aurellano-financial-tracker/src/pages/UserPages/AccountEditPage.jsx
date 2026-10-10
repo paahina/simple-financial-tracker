@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { accountTypeOptions } from '../../components/AccountTypeChip';
 import BelowRemainingChip from '../../components/BelowRemainingChip';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
@@ -115,11 +116,7 @@ const AccountEditPage = () => {
       <Field label="Type">
         <Select
           value={form.type}
-          options={[
-            { value: 'CASH', label: 'Cash' },
-            { value: 'E_WALLET', label: 'E-wallet' },
-            { value: 'BANK', label: 'Bank' },
-          ]}
+          options={accountTypeOptions}
           onChange={(type) => setForm({ ...form, type })}
         />
       </Field>

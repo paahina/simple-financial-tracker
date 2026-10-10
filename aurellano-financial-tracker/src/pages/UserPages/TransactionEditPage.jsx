@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
+import { transactionTypeOptions } from '../../components/TransactionTypeChip';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
@@ -110,10 +111,7 @@ const TransactionEditPage = () => {
       <Field label="Type">
         <Select
           value={form.type}
-          options={[
-            { value: 'EXPENSE', label: 'Expense' },
-            { value: 'INCOME', label: 'Income' },
-          ]}
+          options={transactionTypeOptions}
           onChange={(type) => setForm({ ...form, type, categoryId: '' })}
         />
       </Field>

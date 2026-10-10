@@ -222,6 +222,17 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   assert.equal(limited.body.account.remainingBalance, 50000);
   assert.equal(limited.body.account.balance < limited.body.account.remainingBalance, true);
 
+  const heldBack = await request(app).get('/api/dashboard/get').set(auth(token));
+  assert.equal(heldBack.body.totalMoney, 1675000);
+
+  const reserved = await request(app)
+    .put(`/api/accounts/update/${limited.body.account._id}`)
+    .set(auth(token))
+    .send({ remainingBalance: 2000 });
+  assert.equal(reserved.status, 200);
+  const afterReserve = await request(app).get('/api/dashboard/get').set(auth(token));
+  assert.equal(afterReserve.body.totalMoney, 1683000);
+
   const cleared = await request(app)
     .put(`/api/accounts/update/${limited.body.account._id}`)
     .set(auth(token))

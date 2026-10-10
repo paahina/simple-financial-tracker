@@ -10,7 +10,7 @@ import { createDebtRequest } from '../../services/api';
 import { toCentavos, toIsoDate } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredText } from '../../utils/validate';
 
-const emptyForm = { personName: '', originalAmount: '', dueDate: '' };
+const emptyForm = { personName: '', originalAmount: '', dueDate: '', description: '' };
 
 const DebtCreatePage = () => {
   const { token } = useAuth();
@@ -36,6 +36,7 @@ const DebtCreatePage = () => {
           personName: form.personName,
           originalAmount: toCentavos(form.originalAmount),
           ...(form.dueDate ? { dueDate: toIsoDate(form.dueDate) } : {}),
+          description: form.description.trim(),
         },
         token,
       );
@@ -71,6 +72,13 @@ const DebtCreatePage = () => {
             step="0.01"
             value={form.originalAmount}
             onChange={(event) => setForm({ ...form, originalAmount: event.target.value })}
+          />
+        </Field>
+        <Field label="Description">
+          <input
+            className={inputClass}
+            value={form.description}
+            onChange={(event) => setForm({ ...form, description: event.target.value })}
           />
         </Field>
         <Field label="Due date">

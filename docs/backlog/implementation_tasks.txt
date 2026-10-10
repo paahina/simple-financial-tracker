@@ -75,7 +75,7 @@ PRIORITY C — Debt description UX (partially done)
 C1. Show description on debt card and detail — DONE (verify in QA).
 
 C2. Description on New debt form
-    [ ] Add optional Description field to DebtCreatePage; send description in
+    [x] Add optional Description field to DebtCreatePage; send description in
         createDebtRequest body (server already accepts).
     Files: DebtCreatePage.jsx
 
@@ -84,13 +84,13 @@ PRIORITY D — Transaction type chips
 ----------------------------------------------------------------------
 
 D1. Shared TransactionTypeChip (or extend chip pattern)
-    [ ] INCOME: blue tint (use edit / new income tokens in theme if needed).
-    [ ] EXPENSE: orange/warning tint.
+    [x] INCOME: blue tint (use edit / new income tokens in theme if needed).
+    [x] EXPENSE: orange/warning tint.
     Files: new component, assets/index.js + index.css @theme if new tokens.
 
 D2. Use chips in UI
-    [ ] Transactions day list (card + desktop row): replace plain EXPENSE/INCOME text.
-    [ ] Optional: TransferCreate/TransactionCreate type Select — chip-like labels
+    [x] Transactions day list (card + desktop row): replace plain EXPENSE/INCOME text.
+    [x] Optional: TransferCreate/TransactionCreate type Select — chip-like labels
         in dropdown options or helper text (minimum: list views).
 
 ----------------------------------------------------------------------

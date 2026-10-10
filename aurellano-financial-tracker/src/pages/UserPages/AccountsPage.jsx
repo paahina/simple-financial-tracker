@@ -1,6 +1,7 @@
 import { CircleCheck, CircleOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import AccountTypeChip from '../../components/AccountTypeChip';
 import BelowRemainingChip from '../../components/BelowRemainingChip';
 import Button, { EditLink } from '../../components/Button';
 import Money from '../../components/Money';
@@ -130,7 +131,9 @@ const AccountsPage = () => {
         {accounts?.map((account) => (
           <li key={account._id} className="flex flex-col rounded-lg border border-neutral-200 bg-neutral-0 p-4">
             <p className="font-medium">{account.name}</p>
-            <p className="text-sm text-neutral-500">{account.type}</p>
+            <span className="mt-1">
+              <AccountTypeChip type={account.type} />
+            </span>
             <Money className="mt-2 block text-primary-shade" centavos={account.balance} />
             {belowRemainingBalance(account.balance, account.remainingBalance) && (
               <span className="mt-2">

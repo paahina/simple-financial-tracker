@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import AccountTypeChip from '../../components/AccountTypeChip';
 import Money from '../../components/Money';
 import Tabs from '../../components/Tabs';
 import PagedGrid from '../../components/PagedGrid';
@@ -114,7 +115,9 @@ const DashboardPage = () => {
                 {data.accountBalances.data.map((account) => (
                   <article key={account.id} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4">
                     <p className="font-medium">{account.name}</p>
-                    <p className="text-sm text-neutral-500">{account.type}</p>
+                    <span className="mt-1 block">
+                      <AccountTypeChip type={account.type} />
+                    </span>
                     <Money className="mt-2 block text-primary-shade" centavos={account.balance} />
                   </article>
                 ))}
