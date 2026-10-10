@@ -4,7 +4,23 @@ import { AuthContext } from './auth-context';
 
 const TOKEN_KEY = 'tracker_token';
 const USER_KEY = 'tracker_user';
-const SESSION_TIMEOUT_MS = 20000;
+const SESSION_TIMEOUT_MS = 30000;
+const SESSION_RETRY_LIMIT = 3;
+const SESSION_RETRY_DELAYS_MS = [2000, 4000];
+
+const sleep = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const timeoutId = window.setTimeout(resolve, ms);
+    const onAbort = () => {
+      window.clearTimeout(timeoutId);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 
 const readStoredUser = () => {
   const raw = localStorage.getItem(USER_KEY);
@@ -40,37 +56,68 @@ export const AuthProvider = ({ children }) => {
 
     const id = requestId.current + 1;
     requestId.current = id;
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), SESSION_TIMEOUT_MS);
+    const effectController = new AbortController();
 
-    sessionRequest(token, { signal: controller.signal })
-      .then((data) => {
-        if (requestId.current !== id) return;
-        setUser(data.user);
-        setSessionError('');
-        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-      })
-      .catch((err) => {
-        if (requestId.current !== id) return;
-        if (err instanceof ApiError && err.status === 401) {
-          clearStoredSession();
+    const restoreSession = async () => {
+      let lastError;
+
+      for (let attempt = 0; attempt < SESSION_RETRY_LIMIT; attempt += 1) {
+        if (requestId.current !== id || effectController.signal.aborted) return;
+
+        const attemptController = new AbortController();
+        const abortAttempt = () => attemptController.abort();
+        effectController.signal.addEventListener('abort', abortAttempt);
+        const timeoutId = window.setTimeout(abortAttempt, SESSION_TIMEOUT_MS);
+
+        try {
+          const data = await sessionRequest(token, { signal: attemptController.signal });
+          if (requestId.current !== id) return;
+          setUser(data.user);
+          setSessionError('');
+          localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+          setLoading(false);
           return;
+        } catch (err) {
+          if (requestId.current !== id || effectController.signal.aborted) return;
+          if (err instanceof ApiError && err.status === 401) {
+            clearStoredSession();
+            setLoading(false);
+            return;
+          }
+          if (err instanceof ApiError) {
+            setSessionError(err.message || 'Could not reach the server. Try again.');
+            setLoading(false);
+            return;
+          }
+          lastError = err;
+        } finally {
+          window.clearTimeout(timeoutId);
+          effectController.signal.removeEventListener('abort', abortAttempt);
         }
-        if (err?.name === 'AbortError') {
-          setSessionError('The server took too long to respond. Try again.');
-          return;
+
+        if (attempt < SESSION_RETRY_LIMIT - 1) {
+          try {
+            await sleep(SESSION_RETRY_DELAYS_MS[attempt] ?? 2000, effectController.signal);
+          } catch {
+            return;
+          }
         }
-        setSessionError(err?.message || 'Could not reach the server. Try again.');
-      })
-      .finally(() => {
-        window.clearTimeout(timeoutId);
-        if (requestId.current === id) setLoading(false);
-      });
+      }
+
+      if (requestId.current !== id || effectController.signal.aborted) return;
+      if (lastError?.name === 'AbortError') {
+        setSessionError('The server took too long to respond. Try again.');
+      } else {
+        setSessionError(lastError?.message || 'Could not reach the server. Try again.');
+      }
+      setLoading(false);
+    };
+
+    restoreSession();
 
     return () => {
       requestId.current += 1;
-      window.clearTimeout(timeoutId);
-      controller.abort();
+      effectController.abort();
     };
   }, [token, sessionAttempt, clearStoredSession]);
 
