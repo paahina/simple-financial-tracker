@@ -6,7 +6,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { getDebtRequest, updateDebtRequest } from '../../services/api';
 import { dateInput, fromCentavos, toCentavos, toIsoDate } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredText } from '../../utils/validate';
@@ -59,10 +59,12 @@ const DebtEditPage = () => {
       description: form.description,
     };
     try {
-      await updateDebtRequest(id, payload, token);
-      await invalidateFamilies('debts', 'dashboard');
-      notify('Debt updated');
-      navigate(`/debts/${id}`);
+      await afterSave(async () => {
+        await updateDebtRequest(id, payload, token);
+        navigate(`/debts/${id}`);
+        invalidateFamilies('debts', 'dashboard');
+        notify('Debt updated');
+      });
     } catch (err) {
       setError(err.message);
     }

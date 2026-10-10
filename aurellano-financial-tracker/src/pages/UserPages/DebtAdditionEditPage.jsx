@@ -6,7 +6,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { getDebtRequest, updateDebtAdditionRequest } from '../../services/api';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
@@ -59,18 +59,20 @@ const DebtAdditionEditPage = () => {
     if (hasErrors(nextErrors)) return;
     setError('');
     try {
-      await updateDebtAdditionRequest(
-        additionId,
-        {
-          label: form.label.trim(),
-          amount: toCentavos(form.amount),
-          createdAt: datetimeLocalToIso(form.createdAt),
-        },
-        token,
-      );
-      await invalidateFamilies('debts', 'dashboard');
-      notify('Added amount updated');
-      navigate(closeTo);
+      await afterSave(async () => {
+        await updateDebtAdditionRequest(
+          additionId,
+          {
+            label: form.label.trim(),
+            amount: toCentavos(form.amount),
+            createdAt: datetimeLocalToIso(form.createdAt),
+          },
+          token,
+        );
+        navigate(closeTo);
+        invalidateFamilies('debts', 'dashboard');
+        notify('Added amount updated');
+      });
     } catch (err) {
       setError(err.message);
     }

@@ -7,7 +7,7 @@ import Select from '../../components/Select';
 import { transactionTypeOptions } from '../../components/TransactionTypeChip';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import {
   createTransactionRequest,
@@ -84,24 +84,26 @@ const TransactionCreatePage = () => {
     const pending = [...drafts];
     let saved = 0;
     try {
-      for (const row of drafts) {
-        await createTransactionRequest(
-          {
-            accountId: row.accountId,
-            type: row.type,
-            categoryId: row.categoryId,
-            label: row.label,
-            amount: toCentavos(row.amount),
-            transactionDate: datetimeLocalToIso(transactionDate),
-          },
-          token,
-        );
-        saved += 1;
-        pending.shift();
-      }
-      await invalidateFamilies('transactions', 'dashboard', 'accounts', 'reports');
-      notify(saved === 1 ? 'Transaction saved' : `${saved} transactions saved`);
-      navigate('/transactions');
+      await afterSave(async () => {
+        for (const row of drafts) {
+          await createTransactionRequest(
+            {
+              accountId: row.accountId,
+              type: row.type,
+              categoryId: row.categoryId,
+              label: row.label,
+              amount: toCentavos(row.amount),
+              transactionDate: datetimeLocalToIso(transactionDate),
+            },
+            token,
+          );
+          saved += 1;
+          pending.shift();
+        }
+        navigate('/transactions');
+        invalidateFamilies('transactions', 'dashboard', 'accounts', 'reports');
+        notify(saved === 1 ? 'Transaction saved' : `${saved} transactions saved`);
+      });
     } catch (err) {
       setDrafts(pending.length ? pending : [blankRow()]);
       setActionError(saved ? `${saved} saved. ${err.message}` : err.message);

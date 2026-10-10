@@ -9,7 +9,7 @@ import Pager from '../../components/Pager';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import TransactionTypeChip from '../../components/TransactionTypeChip';
 import { useAuth } from '../../hooks/useAuth';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import {
@@ -71,14 +71,16 @@ const TransactionsPage = () => {
     });
     if (!accepted) return;
     try {
-      await deleteTransactionRequest(id, token);
-      notify('Transaction deleted');
-      await invalidateFamilies('transactions', 'dashboard', 'accounts', 'reports');
-      if (entries.length === 1 && days.length === 1 && page > 0) {
-        setPage((current) => current - 1);
-        return;
-      }
-      if (entries.length === 1 && entryPage > 0) setEntryPage((current) => current - 1);
+      await afterSave(async () => {
+        await deleteTransactionRequest(id, token);
+        invalidateFamilies('transactions', 'dashboard', 'accounts', 'reports');
+        notify('Transaction deleted');
+        if (entries.length === 1 && days.length === 1 && page > 0) {
+          setPage((current) => current - 1);
+          return;
+        }
+        if (entries.length === 1 && entryPage > 0) setEntryPage((current) => current - 1);
+      });
     } catch (err) {
       setActionError(err.message);
     }

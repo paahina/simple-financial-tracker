@@ -6,7 +6,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { createDebtRequest } from '../../services/api';
 import { toCentavos, toIsoDate } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredText } from '../../utils/validate';
@@ -32,18 +32,20 @@ const DebtCreatePage = () => {
     if (hasErrors(nextErrors)) return;
     setError('');
     try {
-      await createDebtRequest(
-        {
-          personName: form.personName,
-          originalAmount: toCentavos(form.originalAmount),
-          ...(form.dueDate ? { dueDate: toIsoDate(form.dueDate) } : {}),
-          description: form.description.trim(),
-        },
-        token,
-      );
-      await invalidateFamilies('debts', 'dashboard');
-      notify('Debt saved');
-      navigate('/debts');
+      await afterSave(async () => {
+        await createDebtRequest(
+          {
+            personName: form.personName,
+            originalAmount: toCentavos(form.originalAmount),
+            ...(form.dueDate ? { dueDate: toIsoDate(form.dueDate) } : {}),
+            description: form.description.trim(),
+          },
+          token,
+        );
+        navigate('/debts');
+        invalidateFamilies('debts', 'dashboard');
+        notify('Debt saved');
+      });
     } catch (err) {
       setError(err.message);
     }

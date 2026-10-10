@@ -6,7 +6,7 @@ import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import { createTransferRequest, getAccountsRequest } from '../../services/api';
 import { datetimeLocalToIso, nowDatetimeLocal, toCentavos } from '../../utils/format';
@@ -90,14 +90,16 @@ const TransferCreatePage = () => {
     const pending = [...drafts];
     let saved = 0;
     try {
-      for (const row of drafts) {
-        await createTransferRequest(transferBody(row), token);
-        saved += 1;
-        pending.shift();
-      }
-      await invalidateFamilies('transfers', 'dashboard', 'accounts');
-      notify(saved === 1 ? 'Transfer saved' : `${saved} transfers saved`);
-      navigate('/transfers');
+      await afterSave(async () => {
+        for (const row of drafts) {
+          await createTransferRequest(transferBody(row), token);
+          saved += 1;
+          pending.shift();
+        }
+        navigate('/transfers');
+        invalidateFamilies('transfers', 'dashboard', 'accounts');
+        notify(saved === 1 ? 'Transfer saved' : `${saved} transfers saved`);
+      });
     } catch (err) {
       setDrafts(pending.length ? pending : [blankRow()]);
       setActionError(saved ? `${saved} saved. ${err.message}` : err.message);

@@ -9,7 +9,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { createAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
 import { toCentavos } from '../../utils/format';
@@ -39,20 +39,22 @@ const AccountCreatePage = () => {
     if (hasErrors(nextErrors)) return;
     setError('');
     try {
-      await createAccountRequest(
-        {
-          name: form.name,
-          type: form.type,
-          initialBalance: toCentavos(form.initialBalance || 0),
-          remainingBalance: remainingCentavos(form.remainingBalance),
-          currency: 'PHP',
-          description: '',
-        },
-        token,
-      );
-      await invalidateFamilies('accounts', 'dashboard');
-      notify('Account created');
-      navigate('/accounts');
+      await afterSave(async () => {
+        await createAccountRequest(
+          {
+            name: form.name,
+            type: form.type,
+            initialBalance: toCentavos(form.initialBalance || 0),
+            remainingBalance: remainingCentavos(form.remainingBalance),
+            currency: 'PHP',
+            description: '',
+          },
+          token,
+        );
+        navigate('/accounts');
+        invalidateFamilies('accounts', 'dashboard');
+        notify('Account created');
+      });
     } catch (err) {
       setError(err.message);
     }

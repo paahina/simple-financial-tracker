@@ -5,7 +5,7 @@ const accountSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     name: { type: String, required: true, trim: true, maxlength: 100 },
     type: { type: String, required: true, enum: ['CASH', 'E_WALLET', 'BANK'] },
-    initialBalance: { type: Number, required: true, min: 0, default: 0 },
+    initialBalance: { type: Number, required: true, default: 0 },
     currency: { type: String, required: true, default: 'PHP', uppercase: true, trim: true },
     description: { type: String, trim: true, default: '' },
     remainingBalance: {

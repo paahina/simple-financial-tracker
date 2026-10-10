@@ -6,7 +6,7 @@ import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import { getAccountsRequest, getTransferRequest, updateTransferRequest } from '../../services/api';
 import { accountOption, selectableAccounts } from '../../utils/accounts';
@@ -67,21 +67,23 @@ const TransferEditPage = () => {
     }
     setError('');
     try {
-      await updateTransferRequest(
-        id,
-        {
-          fromAccountId: form.fromAccountId === 'other' ? null : form.fromAccountId,
-          senderName: form.fromAccountId === 'other' ? form.senderName.trim() : '',
-          toAccountId: form.toAccountId === 'other' ? null : form.toAccountId,
-          recipientName: form.toAccountId === 'other' ? form.recipientName.trim() : '',
-          amount: toCentavos(form.amount),
-          transactionDate: datetimeLocalToIso(form.transactionDate),
-        },
-        token,
-      );
-      await invalidateFamilies('transfers', 'dashboard', 'accounts');
-      notify('Transfer updated');
-      navigate('/transfers');
+      await afterSave(async () => {
+        await updateTransferRequest(
+          id,
+          {
+            fromAccountId: form.fromAccountId === 'other' ? null : form.fromAccountId,
+            senderName: form.fromAccountId === 'other' ? form.senderName.trim() : '',
+            toAccountId: form.toAccountId === 'other' ? null : form.toAccountId,
+            recipientName: form.toAccountId === 'other' ? form.recipientName.trim() : '',
+            amount: toCentavos(form.amount),
+            transactionDate: datetimeLocalToIso(form.transactionDate),
+          },
+          token,
+        );
+        navigate('/transfers');
+        invalidateFamilies('transfers', 'dashboard', 'accounts');
+        notify('Transfer updated');
+      });
     } catch (err) {
       setError(err.message);
     }

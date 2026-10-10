@@ -8,7 +8,7 @@ import DayListDrawer from '../../components/DayListDrawer';
 import Pager from '../../components/Pager';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import {
@@ -81,14 +81,16 @@ const TransfersPage = () => {
     });
     if (!accepted) return;
     try {
-      await deleteTransferRequest(transferId, token);
-      notify('Transfer deleted');
-      await invalidateFamilies('transfers', 'dashboard', 'accounts');
-      if (entries.length === 1 && days.length === 1 && page > 0) {
-        setPage((current) => current - 1);
-        return;
-      }
-      if (entries.length === 1 && entryPage > 0) setEntryPage((current) => current - 1);
+      await afterSave(async () => {
+        await deleteTransferRequest(transferId, token);
+        invalidateFamilies('transfers', 'dashboard', 'accounts');
+        notify('Transfer deleted');
+        if (entries.length === 1 && days.length === 1 && page > 0) {
+          setPage((current) => current - 1);
+          return;
+        }
+        if (entries.length === 1 && entryPage > 0) setEntryPage((current) => current - 1);
+      });
     } catch (err) {
       setActionError(err.message);
     }

@@ -93,13 +93,7 @@ const updateAccount = async (req, res) => {
     if (currentBalance !== undefined) {
       const desired = Number(currentBalance);
       const current = await balanceForAccount(account, models);
-      const nextInitial = account.initialBalance + (desired - current);
-      if (nextInitial < 0) {
-        return res.status(HttpStatus.BAD_REQUEST).json({
-          message: 'Current amount is too low for this account activity',
-        });
-      }
-      account.initialBalance = nextInitial;
+      account.initialBalance = account.initialBalance + (desired - current);
     }
     await account.save();
     res.status(HttpStatus.OK).json(await withBalance(account));

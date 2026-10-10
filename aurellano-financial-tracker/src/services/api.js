@@ -38,6 +38,10 @@ const notifyBusy = (delta) => {
   busyListeners.forEach((listener) => listener(delta));
 };
 
+export const beginBusy = () => notifyBusy(1);
+
+export const endBusy = () => notifyBusy(-1);
+
 const tracksBusy = (path, method) =>
   method !== 'GET' &&
   method !== 'HEAD' &&

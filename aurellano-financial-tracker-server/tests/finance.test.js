@@ -272,6 +272,37 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   assert.equal(reactivated.status, 200);
   assert.equal(reactivated.body.account.isActive, true);
 
+  const adjustable = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Adjustable',
+    type: 'CASH',
+    initialBalance: 0,
+  });
+  assert.equal(adjustable.status, 201);
+  const received = await request(app).post('/api/transactions/create').set(auth(token)).send({
+    accountId: adjustable.body.account._id,
+    type: 'INCOME',
+    amount: 50000,
+    label: 'Received',
+    categoryId: salary._id,
+    transactionDate: today,
+  });
+  assert.equal(received.status, 201);
+  const negativeAmount = await request(app)
+    .put(`/api/accounts/update/${adjustable.body.account._id}`)
+    .set(auth(token))
+    .send({ currentBalance: -1 });
+  assert.equal(negativeAmount.status, 400);
+  const lowered = await request(app)
+    .put(`/api/accounts/update/${adjustable.body.account._id}`)
+    .set(auth(token))
+    .send({ currentBalance: 1000 });
+  assert.equal(lowered.status, 200);
+  assert.equal(lowered.body.balance, 1000);
+  const blockedDelete = await request(app)
+    .delete(`/api/accounts/remove/${adjustable.body.account._id}`)
+    .set(auth(token));
+  assert.equal(blockedDelete.status, 400);
+
   const alreadyActive = await request(app)
     .put(`/api/accounts/reactivate/${spare.body.account._id}`)
     .set(auth(token));

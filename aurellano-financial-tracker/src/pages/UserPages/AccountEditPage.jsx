@@ -11,7 +11,7 @@ import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { deleteAccountRequest, getAccountRequest, updateAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
 import { fromCentavos, toCentavos } from '../../utils/format';
@@ -64,20 +64,22 @@ const AccountEditPage = () => {
     if (hasErrors(nextErrors)) return;
     setError('');
     try {
-      await updateAccountRequest(
-        id,
-        {
-          name: form.name,
-          type: form.type,
-          currentBalance: toCentavos(form.currentAmount || 0),
-          remainingBalance: remainingCentavos(form.remainingBalance),
-          description: form.description,
-        },
-        token,
-      );
-      await invalidateFamilies('accounts', 'dashboard');
-      notify('Account updated');
-      navigate('/accounts');
+      await afterSave(async () => {
+        await updateAccountRequest(
+          id,
+          {
+            name: form.name,
+            type: form.type,
+            currentBalance: toCentavos(form.currentAmount || 0),
+            remainingBalance: remainingCentavos(form.remainingBalance),
+            description: form.description,
+          },
+          token,
+        );
+        navigate('/accounts');
+        invalidateFamilies('accounts', 'dashboard');
+        notify('Account updated');
+      });
     } catch (err) {
       setError(err.message);
     }
@@ -94,10 +96,12 @@ const AccountEditPage = () => {
     if (!accepted) return;
     setError('');
     try {
-      await deleteAccountRequest(id, token);
-      await invalidateFamilies('accounts', 'dashboard');
-      notify('Account deleted');
-      navigate('/accounts');
+      await afterSave(async () => {
+        await deleteAccountRequest(id, token);
+        navigate('/accounts');
+        invalidateFamilies('accounts', 'dashboard');
+        notify('Account deleted');
+      });
     } catch (err) {
       setError(err.message);
     }

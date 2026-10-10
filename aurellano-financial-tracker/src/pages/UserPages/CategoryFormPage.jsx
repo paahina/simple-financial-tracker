@@ -7,7 +7,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { createCategoryRequest, getCategoryRequest, updateCategoryRequest } from '../../services/api';
 import { hasErrors, requiredText } from '../../utils/validate';
 
@@ -48,16 +48,17 @@ const CategoryFormPage = () => {
     if (hasErrors(nextErrors)) return;
     setError('');
     try {
-      if (editing) {
-        await updateCategoryRequest(id, { name: form.name, isActive: form.isActive }, token);
-        await invalidateFamilies('categories');
-        notify('Category updated');
-      } else {
-        await createCategoryRequest({ name: form.name, type: form.type }, token);
-        await invalidateFamilies('categories');
-        notify('Category created');
-      }
-      navigate('/categories');
+      await afterSave(async () => {
+        if (editing) {
+          await updateCategoryRequest(id, { name: form.name, isActive: form.isActive }, token);
+          notify('Category updated');
+        } else {
+          await createCategoryRequest({ name: form.name, type: form.type }, token);
+          notify('Category created');
+        }
+        navigate('/categories');
+        invalidateFamilies('categories');
+      });
     } catch (err) {
       setError(err.message);
     }

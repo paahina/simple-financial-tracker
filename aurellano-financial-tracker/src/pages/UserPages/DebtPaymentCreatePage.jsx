@@ -8,7 +8,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { createDebtPaymentRequest, getAccountsRequest } from '../../services/api';
 import { datetimeLocalToIso, nowDatetimeLocal, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice } from '../../utils/validate';
@@ -43,18 +43,20 @@ const DebtPaymentCreatePage = () => {
     if (hasErrors(nextErrors)) return;
     setActionError('');
     try {
-      await createDebtPaymentRequest(
-        {
-          debtId: id,
-          accountId: form.accountId,
-          amount: toCentavos(form.amount),
-          paymentDate: datetimeLocalToIso(form.paymentDate),
-        },
-        token,
-      );
-      await invalidateFamilies('debts', 'dashboard', 'accounts');
-      notify('Payment recorded');
-      navigate(closeTo);
+      await afterSave(async () => {
+        await createDebtPaymentRequest(
+          {
+            debtId: id,
+            accountId: form.accountId,
+            amount: toCentavos(form.amount),
+            paymentDate: datetimeLocalToIso(form.paymentDate),
+          },
+          token,
+        );
+        navigate(closeTo);
+        invalidateFamilies('debts', 'dashboard', 'accounts');
+        notify('Payment recorded');
+      });
     } catch (err) {
       setActionError(err.message);
     }

@@ -10,7 +10,7 @@ import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { deleteDebtRequest, getDebtsRequest } from '../../services/api';
 import { formatDate, formatPeso } from '../../utils/format';
 
@@ -57,10 +57,12 @@ const DebtsPage = () => {
     });
     if (!accepted) return;
     try {
-      await deleteDebtRequest(debtId, token);
-      notify('Debt deleted');
-      await invalidateFamilies('debts', 'dashboard');
-      if (debts.length === 1 && page > 0) setPage((current) => current - 1);
+      await afterSave(async () => {
+        await deleteDebtRequest(debtId, token);
+        invalidateFamilies('debts', 'dashboard');
+        notify('Debt deleted');
+        if (debts.length === 1 && page > 0) setPage((current) => current - 1);
+      });
     } catch (err) {
       setActionError(err.message);
     }

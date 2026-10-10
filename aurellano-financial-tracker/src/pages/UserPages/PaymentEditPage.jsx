@@ -7,7 +7,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { getAccountsRequest, getDebtRequest, updateDebtPaymentRequest } from '../../services/api';
 import { accountOption, selectableAccounts } from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
@@ -63,19 +63,21 @@ const PaymentEditPage = () => {
     if (hasErrors(nextErrors)) return;
     setError('');
     try {
-      await updateDebtPaymentRequest(
-        paymentId,
-        {
-          accountId: form.accountId,
-          amount: toCentavos(form.amount),
-          paymentDate: datetimeLocalToIso(form.paymentDate),
-          notes: form.notes,
-        },
-        token,
-      );
-      await invalidateFamilies('debts', 'dashboard', 'accounts');
-      notify('Payment updated');
-      navigate(`/debts/${id}?tab=payments`);
+      await afterSave(async () => {
+        await updateDebtPaymentRequest(
+          paymentId,
+          {
+            accountId: form.accountId,
+            amount: toCentavos(form.amount),
+            paymentDate: datetimeLocalToIso(form.paymentDate),
+            notes: form.notes,
+          },
+          token,
+        );
+        navigate(`/debts/${id}?tab=payments`);
+        invalidateFamilies('debts', 'dashboard', 'accounts');
+        notify('Payment updated');
+      });
     } catch (err) {
       setError(err.message);
     }

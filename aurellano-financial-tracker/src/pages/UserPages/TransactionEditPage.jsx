@@ -8,7 +8,7 @@ import { transactionTypeOptions } from '../../components/TransactionTypeChip';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import {
   getAccountsRequest,
@@ -82,18 +82,20 @@ const TransactionEditPage = () => {
     if (hasErrors(nextErrors)) return;
     setError('');
     try {
-      await updateTransactionRequest(
-        id,
-        {
-          ...form,
-          amount: toCentavos(form.amount),
-          transactionDate: datetimeLocalToIso(form.transactionDate),
-        },
-        token,
-      );
-      await invalidateFamilies('transactions', 'dashboard', 'accounts', 'reports');
-      notify('Transaction updated');
-      navigate('/transactions');
+      await afterSave(async () => {
+        await updateTransactionRequest(
+          id,
+          {
+            ...form,
+            amount: toCentavos(form.amount),
+            transactionDate: datetimeLocalToIso(form.transactionDate),
+          },
+          token,
+        );
+        navigate('/transactions');
+        invalidateFamilies('transactions', 'dashboard', 'accounts', 'reports');
+        notify('Transaction updated');
+      });
     } catch (err) {
       setError(err.message);
     }

@@ -8,7 +8,7 @@ import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { deactivateCategoryRequest, getCategoriesRequest } from '../../services/api';
 
 const CategoriesPage = () => {
@@ -38,10 +38,12 @@ const CategoriesPage = () => {
     });
     if (!accepted) return;
     try {
-      await deactivateCategoryRequest(id, token);
-      notify('Category deactivated');
-      await invalidateFamilies('categories');
-      if (categories.length === 1 && page > 0) setPage((current) => current - 1);
+      await afterSave(async () => {
+        await deactivateCategoryRequest(id, token);
+        invalidateFamilies('categories');
+        notify('Category deactivated');
+        if (categories.length === 1 && page > 0) setPage((current) => current - 1);
+      });
     } catch (err) {
       setActionError(err.message);
     }

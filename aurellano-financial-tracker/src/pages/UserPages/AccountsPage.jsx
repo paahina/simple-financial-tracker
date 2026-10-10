@@ -12,7 +12,7 @@ import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
-import { invalidateFamilies } from '../../query/cache';
+import { afterSave, invalidateFamilies } from '../../query/cache';
 import { deactivateAccountRequest, getAccountsRequest, reactivateAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
 
@@ -48,10 +48,12 @@ const AccountsPage = () => {
     });
     if (!accepted) return;
     try {
-      await deactivateAccountRequest(id, token);
-      notify('Account deactivated');
-      await invalidateFamilies('accounts', 'dashboard');
-      if (accounts.length === 1 && page > 0) setPage((current) => current - 1);
+      await afterSave(async () => {
+        await deactivateAccountRequest(id, token);
+        invalidateFamilies('accounts', 'dashboard');
+        notify('Account deactivated');
+        if (accounts.length === 1 && page > 0) setPage((current) => current - 1);
+      });
     } catch (err) {
       setActionError(err.message);
     }
@@ -66,10 +68,12 @@ const AccountsPage = () => {
     });
     if (!accepted) return;
     try {
-      await reactivateAccountRequest(id, token);
-      notify('Account reactivated');
-      await invalidateFamilies('accounts', 'dashboard');
-      if (accounts.length === 1 && page > 0) setPage((current) => current - 1);
+      await afterSave(async () => {
+        await reactivateAccountRequest(id, token);
+        invalidateFamilies('accounts', 'dashboard');
+        notify('Account reactivated');
+        if (accounts.length === 1 && page > 0) setPage((current) => current - 1);
+      });
     } catch (err) {
       setActionError(err.message);
     }
