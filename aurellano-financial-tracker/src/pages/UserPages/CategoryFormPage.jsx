@@ -7,6 +7,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { createCategoryRequest, getCategoryRequest, updateCategoryRequest } from '../../services/api';
 import { hasErrors, requiredText } from '../../utils/validate';
 
@@ -49,9 +50,11 @@ const CategoryFormPage = () => {
     try {
       if (editing) {
         await updateCategoryRequest(id, { name: form.name, isActive: form.isActive }, token);
+        await invalidateFamilies('categories');
         notify('Category updated');
       } else {
         await createCategoryRequest({ name: form.name, type: form.type }, token);
+        await invalidateFamilies('categories');
         notify('Category created');
       }
       navigate('/categories');

@@ -6,6 +6,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { createDebtRequest } from '../../services/api';
 import { toCentavos, toIsoDate } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredText } from '../../utils/validate';
@@ -40,6 +41,7 @@ const DebtCreatePage = () => {
         },
         token,
       );
+      await invalidateFamilies('debts', 'dashboard');
       notify('Debt saved');
       navigate('/debts');
     } catch (err) {

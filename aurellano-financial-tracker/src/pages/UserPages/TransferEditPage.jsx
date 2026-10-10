@@ -6,6 +6,7 @@ import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import { getAccountsRequest, getTransferRequest, updateTransferRequest } from '../../services/api';
 import { accountOption, selectableAccounts } from '../../utils/accounts';
@@ -78,6 +79,7 @@ const TransferEditPage = () => {
         },
         token,
       );
+      await invalidateFamilies('transfers', 'dashboard', 'accounts');
       notify('Transfer updated');
       navigate('/transfers');
     } catch (err) {

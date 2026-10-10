@@ -9,6 +9,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { createAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
 import { toCentavos } from '../../utils/format';
@@ -49,6 +50,7 @@ const AccountCreatePage = () => {
         },
         token,
       );
+      await invalidateFamilies('accounts', 'dashboard');
       notify('Account created');
       navigate('/accounts');
     } catch (err) {

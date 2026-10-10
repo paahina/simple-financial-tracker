@@ -6,6 +6,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { getDebtRequest, updateDebtAdditionRequest } from '../../services/api';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
@@ -67,6 +68,7 @@ const DebtAdditionEditPage = () => {
         },
         token,
       );
+      await invalidateFamilies('debts', 'dashboard');
       notify('Added amount updated');
       navigate(closeTo);
     } catch (err) {

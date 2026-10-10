@@ -94,33 +94,25 @@ D2. Use chips in UI
         in dropdown options or helper text (minimum: list views).
 
 ----------------------------------------------------------------------
-PRIORITY E — Caching (client + Redis + MongoDB)
+PRIORITY E — Caching (client only; MongoDB on server)
 ----------------------------------------------------------------------
 
-See docs/15_caching_rules.txt for full rules.
+See docs/15_caching_rules.txt (Redis section deferred).
 
-E1. Infrastructure
-    [ ] Add REDIS_URL to server .env.example; connect in server bootstrap.
-    [ ] npm install redis in aurellano-financial-tracker-server.
-    [ ] Helper: getCache(key), setCache(key, value, ttlSec), delPattern or
-        delKeys for user:{userId}:resource:*.
-    [ ] If REDIS_URL missing, no-op cache (direct Mongo).
+E1. Server Redis — not used
+    [ ] Skipped: no REDIS_URL, no server read-through cache.
 
-E2. Server cache layer (phase 1 — high value reads)
-    [ ] Wrap getDashboard with cache + invalidation on transaction/transfer/
-        debt payment / account mutations.
-    [ ] Wrap paginated getAllAccounts, getAllDebts (with status), categories list.
-    [ ] TTL 300s; invalidate on writes per 15_caching_rules.txt.
+E2. Server cache layer — not used
+    [ ] Skipped: API reads MongoDB on every request.
 
 E3. Client cache layer
-    [ ] Add TanStack Query (or agreed library).
-    [ ] Replace ad-hoc useEffect fetches on main list pages with useQuery;
+    [x] Add TanStack Query (or agreed library).
+    [x] Replace ad-hoc useEffect fetches on main list pages with useQuery;
         staleTime 5m; invalidateQueries on mutations.
-    [ ] Keep dropdown unpaginated fetches on separate keys; invalidate with lists.
+    [x] Keep dropdown unpaginated fetches on separate keys; invalidate with lists.
 
 E4. Tests
-    [ ] Finance tests still pass without Redis (fallback).
-    [ ] Optional: integration test with mock Redis or skip if no REDIS_URL in CI.
+    [x] Finance tests pass with Mongo-only server.
 
 ----------------------------------------------------------------------
 PRIORITY F — Already discussed / verify only
@@ -149,5 +141,4 @@ Commit grouping (suggested, not mandatory)
 - feat: active and deactivated account tabs
 - feat: transaction type chips
 - feat: optional debt description on create
-- feat: add Redis and read-through cache with invalidation
 - feat: client query cache with five-minute stale time

@@ -1,5 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
 import { BarChart } from '@mui/x-charts/BarChart';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Field, { inputClass } from '../../components/Field';
 import Tabs from '../../components/Tabs';
@@ -44,52 +45,29 @@ const ReportsPage = () => {
   const tab = searchParams.get('tab') === 'expenses' ? 'expenses' : 'summary';
   const [year, setYear] = useState(String(now.getUTCFullYear()));
   const [month, setMonth] = useState(String(now.getUTCMonth() + 1));
-  const [monthly, setMonthly] = useState(null);
-  const [yearly, setYearly] = useState(null);
-  const [error, setError] = useState('');
-  const [expenseLoading, setExpenseLoading] = useState(true);
   const [expenseModel, setExpenseModel] = useState({ page: 0, pageSize: 10 });
   const [incomePage, setIncomePage] = useState({ page: 0, pageSize: 10 });
   const [expenseCategoryPage, setExpenseCategoryPage] = useState({ page: 0, pageSize: 10 });
-
-  useEffect(() => {
-    let active = true;
-    getYearlyReportRequest(token, year)
-      .then((yearReport) => {
-        if (active) setYearly(yearReport);
-      })
-      .catch((err) => {
-        if (active) setError(err.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [token, year]);
-
-  useEffect(() => {
-    let active = true;
-    setExpenseLoading(true);
-    getMonthlyReportRequest(token, year, month, expenseModel.page + 1, expenseModel.pageSize, {
-      incomePage: incomePage.page + 1,
-      incomeLimit: incomePage.pageSize,
-      expenseCategoryPage: expenseCategoryPage.page + 1,
-      expenseCategoryLimit: expenseCategoryPage.pageSize,
-    })
-      .then((monthReport) => {
-        if (!active) return;
-        setError('');
-        setMonthly(monthReport);
-      })
-      .catch((err) => {
-        if (active) setError(err.message);
-      })
-      .finally(() => {
-        if (active) setExpenseLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [token, year, month, expenseModel, incomePage, expenseCategoryPage]);
+  const yearlyQuery = useQuery({
+    queryKey: ['reports', 'year', { year }],
+    queryFn: () => getYearlyReportRequest(token, year),
+    enabled: Boolean(token),
+  });
+  const monthlyQuery = useQuery({
+    queryKey: ['reports', 'month', { year, month, expenseModel, incomePage, expenseCategoryPage }],
+    queryFn: () =>
+      getMonthlyReportRequest(token, year, month, expenseModel.page + 1, expenseModel.pageSize, {
+        incomePage: incomePage.page + 1,
+        incomeLimit: incomePage.pageSize,
+        expenseCategoryPage: expenseCategoryPage.page + 1,
+        expenseCategoryLimit: expenseCategoryPage.pageSize,
+      }),
+    enabled: Boolean(token),
+  });
+  const yearly = yearlyQuery.data;
+  const monthly = monthlyQuery.data;
+  const error = yearlyQuery.error?.message || monthlyQuery.error?.message || '';
+  const expenseLoading = monthlyQuery.isFetching;
 
   const onYearChange = (event) => {
     setYear(event.target.value);

@@ -1,5 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
 import { CircleCheck, CircleOff } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import AccountTypeChip from '../../components/AccountTypeChip';
 import BelowRemainingChip from '../../components/BelowRemainingChip';
@@ -11,6 +12,7 @@ import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { deactivateAccountRequest, getAccountsRequest, reactivateAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
 
@@ -23,32 +25,18 @@ const AccountsPage = () => {
   const tab = searchParams.get('tab') === 'deactivated' ? 'deactivated' : 'active';
   const { notify } = useToast();
   const confirm = useConfirm();
-  const [accounts, setAccounts] = useState(null);
-  const [total, setTotal] = useState(0);
-  const [counts, setCounts] = useState(emptyCounts);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [error, setError] = useState('');
-  const [reload, setReload] = useState(0);
-  const requestId = useRef(0);
-
-  useEffect(() => {
-    const id = requestId.current + 1;
-    requestId.current = id;
-    getAccountsRequest(token, { page: page + 1, limit: pageSize, isActive: tab === 'active' })
-      .then((result) => {
-        if (requestId.current !== id) return;
-        setAccounts(result.data);
-        setTotal(result.total);
-        setCounts(result.counts || emptyCounts);
-      })
-      .catch((err) => {
-        if (requestId.current === id) setError(err.message);
-      });
-    return () => {
-      requestId.current += 1;
-    };
-  }, [token, page, pageSize, tab, reload]);
+  const [actionError, setActionError] = useState('');
+  const accountsQuery = useQuery({
+    queryKey: ['accounts', 'page', { page, pageSize, tab }],
+    queryFn: () => getAccountsRequest(token, { page: page + 1, limit: pageSize, isActive: tab === 'active' }),
+    enabled: Boolean(token),
+  });
+  const accounts = accountsQuery.data?.data ?? null;
+  const total = accountsQuery.data?.total ?? 0;
+  const counts = accountsQuery.data?.counts || emptyCounts;
+  const error = actionError || accountsQuery.error?.message || '';
 
   const onDeactivate = async (id) => {
     const accepted = await confirm({
@@ -62,14 +50,10 @@ const AccountsPage = () => {
     try {
       await deactivateAccountRequest(id, token);
       notify('Account deactivated');
-      setAccounts(null);
-      if (accounts.length === 1 && page > 0) {
-        setPage((current) => current - 1);
-        return;
-      }
-      setReload((current) => current + 1);
+      await invalidateFamilies('accounts', 'dashboard');
+      if (accounts.length === 1 && page > 0) setPage((current) => current - 1);
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
     }
   };
 
@@ -84,14 +68,10 @@ const AccountsPage = () => {
     try {
       await reactivateAccountRequest(id, token);
       notify('Account reactivated');
-      setAccounts(null);
-      if (accounts.length === 1 && page > 0) {
-        setPage((current) => current - 1);
-        return;
-      }
-      setReload((current) => current + 1);
+      await invalidateFamilies('accounts', 'dashboard');
+      if (accounts.length === 1 && page > 0) setPage((current) => current - 1);
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
     }
   };
 
@@ -118,14 +98,13 @@ const AccountsPage = () => {
         ]}
         onChange={(id) => {
           if (id === tab) return;
-          setAccounts(null);
-          setError('');
+          setActionError('');
           setPage(0);
           setSearchParams(id === 'deactivated' ? { tab: 'deactivated' } : {});
         }}
       />
       <ErrorText message={error} />
-      {!accounts && !error && <Loading variant="cards" />}
+      {accountsQuery.isPending && !error && <Loading variant="cards" />}
       {accounts?.length === 0 && <Empty label={emptyLabel} />}
       <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {accounts?.map((account) => (
@@ -164,7 +143,6 @@ const AccountsPage = () => {
           total={total}
           label="Accounts"
           onPageChange={(nextPage, nextSize) => {
-            setAccounts(null);
             setPage(nextPage);
             setPageSize(nextSize);
           }}

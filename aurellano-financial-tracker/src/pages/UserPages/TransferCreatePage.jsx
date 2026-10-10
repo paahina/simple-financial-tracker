@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button, { editLinkClass } from '../../components/Button';
@@ -5,6 +6,7 @@ import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import { createTransferRequest, getAccountsRequest } from '../../services/api';
 import { datetimeLocalToIso, nowDatetimeLocal, toCentavos } from '../../utils/format';
@@ -25,8 +27,7 @@ const TransferCreatePage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
   const navigate = useNavigate();
-  const [activeAccounts, setActiveAccounts] = useState([]);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [dateError, setDateError] = useState('');
   const [transactionDate, setTransactionDate] = useState(nowDatetimeLocal());
@@ -34,11 +35,13 @@ const TransferCreatePage = () => {
   const [saving, setSaving] = useState(false);
   const cardRowRef = useRef(null);
 
-  useEffect(() => {
-    getAccountsRequest(token, { activeOnly: true })
-      .then(setActiveAccounts)
-      .catch((err) => setError(err.message));
-  }, [token]);
+  const accountsQuery = useQuery({
+    queryKey: ['accounts', 'options', { activeOnly: true }],
+    queryFn: () => getAccountsRequest(token, { activeOnly: true }),
+    enabled: Boolean(token),
+  });
+  const activeAccounts = accountsQuery.data ?? [];
+  const error = actionError || accountsQuery.error?.message || '';
 
   useEffect(() => {
     const node = cardRowRef.current;
@@ -79,10 +82,10 @@ const TransferCreatePage = () => {
     setDateError(nextDateError);
     setFieldErrors(nextErrors);
     if (nextDateError || formError || drafts.some((row) => hasErrors(nextErrors[row.key]))) {
-      setError(formError);
+      setActionError(formError);
       return;
     }
-    setError('');
+    setActionError('');
     setSaving(true);
     const pending = [...drafts];
     let saved = 0;
@@ -92,11 +95,12 @@ const TransferCreatePage = () => {
         saved += 1;
         pending.shift();
       }
+      await invalidateFamilies('transfers', 'dashboard', 'accounts');
       notify(saved === 1 ? 'Transfer saved' : `${saved} transfers saved`);
       navigate('/transfers');
     } catch (err) {
       setDrafts(pending.length ? pending : [blankRow()]);
-      setError(saved ? `${saved} saved. ${err.message}` : err.message);
+      setActionError(saved ? `${saved} saved. ${err.message}` : err.message);
     } finally {
       setSaving(false);
     }

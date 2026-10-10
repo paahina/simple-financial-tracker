@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import Button, { EditLink } from '../../components/Button';
@@ -7,6 +8,7 @@ import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { deleteDebtRequest, getDebtsRequest } from '../../services/api';
 import { formatDate, formatPeso } from '../../utils/format';
 
@@ -15,26 +17,17 @@ const DebtsPage = () => {
   const location = useLocation();
   const { notify } = useToast();
   const confirm = useConfirm();
-  const [debts, setDebts] = useState(null);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [error, setError] = useState('');
-
-  const load = useCallback(
-    () =>
-      getDebtsRequest(token, { page: page + 1, limit: pageSize })
-        .then((result) => {
-          setDebts(result.data);
-          setTotal(result.total);
-        })
-        .catch((err) => setError(err.message)),
-    [token, page, pageSize],
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const [actionError, setActionError] = useState('');
+  const debtsQuery = useQuery({
+    queryKey: ['debts', 'page', { page, pageSize }],
+    queryFn: () => getDebtsRequest(token, { page: page + 1, limit: pageSize }),
+    enabled: Boolean(token),
+  });
+  const debts = debtsQuery.data?.data ?? null;
+  const total = debtsQuery.data?.total ?? 0;
+  const error = actionError || debtsQuery.error?.message || '';
 
   const onDelete = async (debtId) => {
     const accepted = await confirm({
@@ -48,13 +41,10 @@ const DebtsPage = () => {
     try {
       await deleteDebtRequest(debtId, token);
       notify('Debt deleted');
-      if (debts.length === 1 && page > 0) {
-        setPage((current) => current - 1);
-        return;
-      }
-      await load();
+      await invalidateFamilies('debts', 'dashboard');
+      if (debts.length === 1 && page > 0) setPage((current) => current - 1);
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
     }
   };
 

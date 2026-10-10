@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AccountTypeChip from '../../components/AccountTypeChip';
 import Money from '../../components/Money';
@@ -37,42 +38,25 @@ const DashboardPage = () => {
   const { token } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') === 'transactions' ? 'transactions' : 'summary';
-  const [data, setData] = useState(null);
-  const [error, setError] = useState('');
-  const [transactions, setTransactions] = useState([]);
-  const [transactionTotal, setTransactionTotal] = useState(0);
-  const [transactionError, setTransactionError] = useState('');
-  const [gridLoading, setGridLoading] = useState(true);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
   const [accountPage, setAccountPage] = useState(0);
   const [accountPageSize, setAccountPageSize] = useState(10);
-
-  useEffect(() => {
-    getDashboardRequest(token, accountPage + 1, accountPageSize)
-      .then(setData)
-      .catch((err) => setError(err.message));
-  }, [token, accountPage, accountPageSize]);
-
-  useEffect(() => {
-    let active = true;
-    setGridLoading(true);
-    getTransactionsRequest(token, paginationModel.page + 1, paginationModel.pageSize)
-      .then((result) => {
-        if (!active) return;
-        setTransactionError('');
-        setTransactions(result.data.map((item) => ({ ...item, id: item._id })));
-        setTransactionTotal(result.total);
-      })
-      .catch((err) => {
-        if (active) setTransactionError(err.message);
-      })
-      .finally(() => {
-        if (active) setGridLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [token, paginationModel]);
+  const dashboardQuery = useQuery({
+    queryKey: ['dashboard', { accountPage, accountPageSize }],
+    queryFn: () => getDashboardRequest(token, accountPage + 1, accountPageSize),
+    enabled: Boolean(token),
+  });
+  const transactionsQuery = useQuery({
+    queryKey: ['transactions', 'recent', paginationModel],
+    queryFn: () => getTransactionsRequest(token, paginationModel.page + 1, paginationModel.pageSize),
+    enabled: Boolean(token),
+  });
+  const data = dashboardQuery.data;
+  const error = dashboardQuery.error?.message || '';
+  const transactions = transactionsQuery.data?.data.map((item) => ({ ...item, id: item._id })) ?? [];
+  const transactionTotal = transactionsQuery.data?.total ?? 0;
+  const transactionError = transactionsQuery.error?.message || '';
+  const gridLoading = transactionsQuery.isFetching;
 
   if (error && !data) return <ErrorText message={error} />;
   if (!data) return <Loading variant={tab === 'transactions' ? 'dashboardTransactions' : 'dashboard'} />;

@@ -11,6 +11,7 @@ import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { deleteAccountRequest, getAccountRequest, updateAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
 import { fromCentavos, toCentavos } from '../../utils/format';
@@ -74,6 +75,7 @@ const AccountEditPage = () => {
         },
         token,
       );
+      await invalidateFamilies('accounts', 'dashboard');
       notify('Account updated');
       navigate('/accounts');
     } catch (err) {
@@ -93,6 +95,7 @@ const AccountEditPage = () => {
     setError('');
     try {
       await deleteAccountRequest(id, token);
+      await invalidateFamilies('accounts', 'dashboard');
       notify('Account deleted');
       navigate('/accounts');
     } catch (err) {
