@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
 import Pager from '../../components/Pager';
 import StatusChip from '../../components/StatusChip';
@@ -9,6 +10,7 @@ import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { deleteDebtRequest, getDebtsRequest } from '../../services/api';
 import { formatDate, formatPeso } from '../../utils/format';
 
@@ -31,41 +33,19 @@ const DebtsPage = () => {
   const status = statusTabs.find((tab) => tab.id === statusId);
   const { notify } = useToast();
   const confirm = useConfirm();
-  const [debts, setDebts] = useState(null);
-  const [total, setTotal] = useState(0);
-  const [counts, setCounts] = useState(emptyCounts);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [error, setError] = useState('');
-
-  const load = useCallback(
-    () =>
-      getDebtsRequest(token, { page: page + 1, limit: pageSize, status: status.value })
-        .then((result) => {
-          setDebts(result.data);
-          setTotal(result.total);
-          setCounts(result.counts || emptyCounts);
-        })
-        .catch((err) => setError(err.message)),
-    [token, page, pageSize, status.value],
-  );
-
-  useEffect(() => {
-    let active = true;
-    getDebtsRequest(token, { page: page + 1, limit: pageSize, status: status.value })
-      .then((result) => {
-        if (!active) return;
-        setDebts(result.data);
-        setTotal(result.total);
-        setCounts(result.counts || emptyCounts);
-      })
-      .catch((err) => {
-        if (active) setError(err.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [token, page, pageSize, status.value]);
+  const [actionError, setActionError] = useState('');
+  const debtsQuery = useQuery({
+    queryKey: ['debts', 'page', { page, pageSize, status: status.value }],
+    queryFn: () =>
+      getDebtsRequest(token, { page: page + 1, limit: pageSize, status: status.value }),
+    enabled: Boolean(token),
+  });
+  const debts = debtsQuery.data?.data ?? null;
+  const total = debtsQuery.data?.total ?? 0;
+  const counts = debtsQuery.data?.counts || emptyCounts;
+  const error = actionError || debtsQuery.error?.message || '';
 
   const onDelete = async (debtId) => {
     const accepted = await confirm({
@@ -79,13 +59,10 @@ const DebtsPage = () => {
     try {
       await deleteDebtRequest(debtId, token);
       notify('Debt deleted');
-      if (debts.length === 1 && page > 0) {
-        setPage((current) => current - 1);
-        return;
-      }
-      await load();
+      await invalidateFamilies('debts', 'dashboard');
+      if (debts.length === 1 && page > 0) setPage((current) => current - 1);
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
     }
   };
 
@@ -100,17 +77,19 @@ const DebtsPage = () => {
       <p className="text-sm text-neutral-500">This is money other people owe you. It is separate from the cash in your accounts.</p>
       <Tabs
         value={statusId}
-        tabs={statusTabs.map((tab) => ({ id: tab.id, label: `${tab.label} ${counts[tab.value]}` }))}
+        tabs={statusTabs.map((tab) => ({
+          id: tab.id,
+          label: `${tab.label} ${counts[tab.value]}`,
+        }))}
         onChange={(id) => {
           if (id === statusId) return;
-          setDebts(null);
-          setError('');
+          setActionError('');
           setPage(0);
           setSearchParams(id === 'pending' ? {} : { status: id });
         }}
       />
       <ErrorText message={error} />
-      {!debts && !error && <Loading variant="cards" />}
+      {debtsQuery.isPending && !error && <Loading variant="cards" />}
       {debts?.length === 0 && (
         <Empty
           label={

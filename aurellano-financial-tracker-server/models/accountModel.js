@@ -8,6 +8,14 @@ const accountSchema = new mongoose.Schema(
     initialBalance: { type: Number, required: true, min: 0, default: 0 },
     currency: { type: String, required: true, default: 'PHP', uppercase: true, trim: true },
     description: { type: String, trim: true, default: '' },
+    remainingBalance: {
+      type: Number,
+      default: null,
+      validate: {
+        validator: (value) => value == null || (Number.isInteger(value) && value >= 0),
+        message: 'Remaining balance cannot be negative',
+      },
+    },
     isActive: { type: Boolean, required: true, default: true },
   },
   { timestamps: true },

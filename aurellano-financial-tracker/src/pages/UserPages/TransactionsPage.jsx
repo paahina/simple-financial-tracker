@@ -1,12 +1,15 @@
+import { useQuery } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
 import DayGroupList from '../../components/DayGroupList';
 import DayListDrawer from '../../components/DayListDrawer';
 import Pager from '../../components/Pager';
 import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
+import TransactionTypeChip from '../../components/TransactionTypeChip';
 import { useAuth } from '../../hooks/useAuth';
+import { invalidateFamilies } from '../../query/cache';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import {
@@ -20,34 +23,21 @@ const TransactionsPage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
   const confirm = useConfirm();
-  const [days, setDays] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [selectedDay, setSelectedDay] = useState(null);
-  const [entries, setEntries] = useState([]);
-  const [entryTotal, setEntryTotal] = useState(0);
   const [entryPage, setEntryPage] = useState(0);
   const [entryPageSize, setEntryPageSize] = useState(10);
-  const [dayLoading, setDayLoading] = useState(false);
   const [daysOpen, setDaysOpen] = useState(false);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    return getTransactionDaysRequest(token, page + 1, pageSize)
-      .then((result) => {
-        setDays(result.data);
-        setTotal(result.total);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [token, page, pageSize]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const daysQuery = useQuery({
+    queryKey: ['transactions', 'days', { page, pageSize }],
+    queryFn: () => getTransactionDaysRequest(token, page + 1, pageSize),
+    enabled: Boolean(token),
+  });
+  const days = daysQuery.data?.data ?? [];
+  const total = daysQuery.data?.total ?? 0;
+  const loading = daysQuery.isPending;
 
   useEffect(() => {
     setSelectedDay((current) => {
@@ -56,28 +46,20 @@ const TransactionsPage = () => {
     });
   }, [days]);
 
-  const loadEntries = useCallback(
-    (date) => {
-      setDayLoading(true);
-      const range = localDayBoundsIso(date);
-      return getTransactionsRequest(token, entryPage + 1, entryPageSize, range)
-        .then((result) => {
-          setEntries(result.data);
-          setEntryTotal(result.total);
-        })
-        .catch((err) => setError(err.message))
-        .finally(() => setDayLoading(false));
-    },
-    [token, entryPage, entryPageSize],
-  );
+  const entriesQuery = useQuery({
+    queryKey: ['transactions', 'entries', { date: selectedDay?.date, entryPage, entryPageSize }],
+    queryFn: () =>
+      getTransactionsRequest(token, entryPage + 1, entryPageSize, localDayBoundsIso(selectedDay.date)),
+    enabled: Boolean(token && selectedDay),
+  });
+  const entries = entriesQuery.data?.data ?? [];
+  const entryTotal = entriesQuery.data?.total ?? 0;
+  const dayLoading = Boolean(selectedDay) && entriesQuery.isPending;
+  const error = actionError || daysQuery.error?.message || entriesQuery.error?.message || '';
 
   useEffect(() => {
     setEntryPage(0);
   }, [selectedDay?.date]);
-
-  useEffect(() => {
-    if (selectedDay) loadEntries(selectedDay.date);
-  }, [selectedDay, loadEntries]);
 
   const onDelete = async (id) => {
     const accepted = await confirm({
@@ -91,20 +73,14 @@ const TransactionsPage = () => {
     try {
       await deleteTransactionRequest(id, token);
       notify('Transaction deleted');
+      await invalidateFamilies('transactions', 'dashboard', 'accounts', 'reports');
       if (entries.length === 1 && days.length === 1 && page > 0) {
-        setEntries([]);
-        setEntryTotal(0);
         setPage((current) => current - 1);
         return;
       }
-      if (entries.length === 1 && entryPage > 0) {
-        setEntryPage((current) => current - 1);
-      } else if (selectedDay) {
-        await loadEntries(selectedDay.date);
-      }
-      await load();
+      if (entries.length === 1 && entryPage > 0) setEntryPage((current) => current - 1);
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
     }
   };
 
@@ -156,8 +132,9 @@ const TransactionsPage = () => {
                     <div className="flex items-start justify-between gap-3 lg:block">
                       <span>
                         {item.label}
-                        <span className="mt-1 block text-neutral-500 lg:ml-2 lg:mt-0 lg:inline">
-                          {item.type} · {formatDateTime(item.transactionDate)}
+                        <span className="mt-1 flex flex-wrap items-center gap-2 text-neutral-500 lg:ml-2 lg:mt-0 lg:inline-flex">
+                          <TransactionTypeChip type={item.type} />
+                          <span>{formatDateTime(item.transactionDate)}</span>
                         </span>
                       </span>
                       <span className="shrink-0 font-medium lg:hidden">{formatPeso(item.amount)}</span>

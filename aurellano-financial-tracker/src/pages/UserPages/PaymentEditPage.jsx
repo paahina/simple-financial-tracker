@@ -7,7 +7,9 @@ import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { getAccountsRequest, getDebtRequest, updateDebtPaymentRequest } from '../../services/api';
+import { accountOption, selectableAccounts } from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice } from '../../utils/validate';
 
@@ -32,7 +34,7 @@ const PaymentEditPage = () => {
           setError('Payment not found');
           return;
         }
-        setAccounts(accountList.filter((account) => account.isActive));
+        setAccounts(selectableAccounts(accountList, [payment.accountId]));
         const nextForm = {
           accountId: payment.accountId,
           amount: fromCentavos(payment.amount),
@@ -71,6 +73,7 @@ const PaymentEditPage = () => {
         },
         token,
       );
+      await invalidateFamilies('debts', 'dashboard', 'accounts');
       notify('Payment updated');
       navigate(`/debts/${id}?tab=payments`);
     } catch (err) {
@@ -91,7 +94,7 @@ const PaymentEditPage = () => {
       <Field label="Money goes into" error={fieldErrors.accountId}>
         <Select
           value={form.accountId}
-          options={accounts.map((account) => ({ value: account._id, label: account.name }))}
+          options={accounts.map(accountOption)}
           onChange={(accountId) => setForm({ ...form, accountId })}
         />
       </Field>

@@ -2,6 +2,8 @@ const express = require('express');
 const {
   createAccount,
   deactivateAccount,
+  deleteAccount,
+  reactivateAccount,
   getAccountActivity,
   getAccountById,
   getAllAccounts,
@@ -23,5 +25,7 @@ router.get('/get/:id', mongoIdParamValidation, getAccountById);
 router.post('/create', accountValidation, createAccount);
 router.put('/update/:id', mongoIdParamValidation, accountUpdateValidation, updateAccount);
 router.delete('/delete/:id', mongoIdParamValidation, deactivateAccount);
+router.put('/reactivate/:id', mongoIdParamValidation, reactivateAccount);
+router.delete('/remove/:id', mongoIdParamValidation, deleteAccount);
 
 module.exports = router;

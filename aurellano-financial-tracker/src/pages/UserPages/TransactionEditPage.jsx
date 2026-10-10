@@ -1,11 +1,14 @@
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
+import { transactionTypeOptions } from '../../components/TransactionTypeChip';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import {
   getAccountsRequest,
@@ -13,6 +16,7 @@ import {
   getTransactionRequest,
   updateTransactionRequest,
 } from '../../services/api';
+import { accountOption, selectableAccounts } from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
@@ -23,22 +27,24 @@ const TransactionEditPage = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
   const [baseline, setBaseline] = useState('');
-  const [accounts, setAccounts] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const accountsQuery = useQuery({
+    queryKey: ['accounts', 'options', { activeOnly: false }],
+    queryFn: () => getAccountsRequest(token),
+    enabled: Boolean(token),
+  });
+  const categoriesQuery = useQuery({
+    queryKey: ['categories', 'options', { type: 'all', includeInactive: false }],
+    queryFn: () => getCategoriesRequest(token),
+    enabled: Boolean(token),
+  });
 
   useEffect(() => {
     let active = true;
-    Promise.all([
-      getTransactionRequest(id, token),
-      getAccountsRequest(token),
-      getCategoriesRequest(token),
-    ])
-      .then(([transaction, accountList, categoryList]) => {
+    getTransactionRequest(id, token)
+      .then((transaction) => {
         if (!active) return;
-        setAccounts(accountList.filter((account) => account.isActive));
-        setCategories(categoryList);
         const nextForm = {
           accountId: transaction.accountId,
           type: transaction.type,
@@ -58,7 +64,10 @@ const TransactionEditPage = () => {
     };
   }, [id, token]);
 
+  const accounts = selectableAccounts(accountsQuery.data || [], [form?.accountId]);
+  const categories = categoriesQuery.data || [];
   const matchingCategories = categories.filter((category) => category.type === form?.type);
+  const loadError = error || accountsQuery.error?.message || categoriesQuery.error?.message || '';
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -82,6 +91,7 @@ const TransactionEditPage = () => {
         },
         token,
       );
+      await invalidateFamilies('transactions', 'dashboard', 'accounts', 'reports');
       notify('Transaction updated');
       navigate('/transactions');
     } catch (err) {
@@ -93,26 +103,23 @@ const TransactionEditPage = () => {
 
   return (
     <FormModal dirty={dirty} closeTo="/transactions">
-      {error && !form && <ErrorText message={error} />}
-      {!form && !error && <Loading variant="form" />}
+      {loadError && !form && <ErrorText message={loadError} />}
+      {!form && !loadError && <Loading variant="form" />}
       {form && (
     <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
       <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit transaction</h1>
-      <ErrorText message={error} />
+      <ErrorText message={loadError} />
       <Field label="Account" error={fieldErrors.accountId}>
         <Select
           value={form.accountId}
-          options={accounts.map((account) => ({ value: account._id, label: account.name }))}
+          options={accounts.map(accountOption)}
           onChange={(accountId) => setForm({ ...form, accountId })}
         />
       </Field>
       <Field label="Type">
         <Select
           value={form.type}
-          options={[
-            { value: 'EXPENSE', label: 'Expense' },
-            { value: 'INCOME', label: 'Income' },
-          ]}
+          options={transactionTypeOptions}
           onChange={(type) => setForm({ ...form, type, categoryId: '' })}
         />
       </Field>

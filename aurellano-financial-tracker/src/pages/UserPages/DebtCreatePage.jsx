@@ -6,11 +6,12 @@ import FormModal from '../../components/FormModal';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { createDebtRequest } from '../../services/api';
 import { toCentavos, toIsoDate } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredText } from '../../utils/validate';
 
-const emptyForm = { personName: '', originalAmount: '', dueDate: '' };
+const emptyForm = { personName: '', originalAmount: '', dueDate: '', description: '' };
 
 const DebtCreatePage = () => {
   const { token } = useAuth();
@@ -36,9 +37,11 @@ const DebtCreatePage = () => {
           personName: form.personName,
           originalAmount: toCentavos(form.originalAmount),
           ...(form.dueDate ? { dueDate: toIsoDate(form.dueDate) } : {}),
+          description: form.description.trim(),
         },
         token,
       );
+      await invalidateFamilies('debts', 'dashboard');
       notify('Debt saved');
       navigate('/debts');
     } catch (err) {
@@ -71,6 +74,13 @@ const DebtCreatePage = () => {
             step="0.01"
             value={form.originalAmount}
             onChange={(event) => setForm({ ...form, originalAmount: event.target.value })}
+          />
+        </Field>
+        <Field label="Description">
+          <input
+            className={inputClass}
+            value={form.description}
+            onChange={(event) => setForm({ ...form, description: event.target.value })}
           />
         </Field>
         <Field label="Due date">

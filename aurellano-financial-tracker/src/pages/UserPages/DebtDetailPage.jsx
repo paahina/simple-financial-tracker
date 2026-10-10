@@ -9,6 +9,7 @@ import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { deleteDebtAdditionRequest, deleteDebtPaymentRequest, getAccountsRequest, getDebtRequest } from '../../services/api';
 import { formatDate, formatDateTime, formatPeso } from '../../utils/format';
 
@@ -72,6 +73,7 @@ const DebtDetailPage = () => {
     if (!accepted) return;
     try {
       await deleteDebtAdditionRequest(additionId, token);
+      await invalidateFamilies('debts', 'dashboard');
       notify('Added amount deleted');
       if (additions.length === 1 && additionPage > 0) {
         setAdditionPage((current) => current - 1);
@@ -94,6 +96,7 @@ const DebtDetailPage = () => {
     if (!accepted) return;
     try {
       await deleteDebtPaymentRequest(paymentId, token);
+      await invalidateFamilies('debts', 'dashboard', 'accounts');
       notify('Payment deleted');
       if (payments.length === 1 && paymentPage > 0) {
         setPaymentPage((current) => current - 1);

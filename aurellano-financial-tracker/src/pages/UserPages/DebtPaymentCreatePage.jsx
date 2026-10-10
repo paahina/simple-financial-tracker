@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
@@ -7,6 +8,7 @@ import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { createDebtPaymentRequest, getAccountsRequest } from '../../services/api';
 import { datetimeLocalToIso, nowDatetimeLocal, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice } from '../../utils/validate';
@@ -18,16 +20,17 @@ const DebtPaymentCreatePage = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({ accountId: '', amount: '', paymentDate: nowDatetimeLocal() });
   const [baseline] = useState(() => JSON.stringify(form));
-  const [accounts, setAccounts] = useState(null);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const closeTo = `/debts/${id}?tab=payments`;
 
-  useEffect(() => {
-    getAccountsRequest(token)
-      .then((accountList) => setAccounts(accountList.filter((account) => account.isActive)))
-      .catch((err) => setError(err.message));
-  }, [token]);
+  const accountsQuery = useQuery({
+    queryKey: ['accounts', 'options', { activeOnly: true }],
+    queryFn: () => getAccountsRequest(token, { activeOnly: true }),
+    enabled: Boolean(token),
+  });
+  const accounts = accountsQuery.data ?? null;
+  const error = actionError || accountsQuery.error?.message || '';
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -38,7 +41,7 @@ const DebtPaymentCreatePage = () => {
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
-    setError('');
+    setActionError('');
     try {
       await createDebtPaymentRequest(
         {
@@ -49,10 +52,11 @@ const DebtPaymentCreatePage = () => {
         },
         token,
       );
+      await invalidateFamilies('debts', 'dashboard', 'accounts');
       notify('Payment recorded');
       navigate(closeTo);
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
     }
   };
 

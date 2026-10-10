@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { CircleOff } from 'lucide-react';
 import Button, { EditLink } from '../../components/Button';
@@ -7,6 +8,7 @@ import { Empty, ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
+import { invalidateFamilies } from '../../query/cache';
 import { deactivateCategoryRequest, getCategoriesRequest } from '../../services/api';
 
 const CategoriesPage = () => {
@@ -14,26 +16,17 @@ const CategoriesPage = () => {
   const location = useLocation();
   const { notify } = useToast();
   const confirm = useConfirm();
-  const [categories, setCategories] = useState(null);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [error, setError] = useState('');
-
-  const load = useCallback(
-    () =>
-      getCategoriesRequest(token, { includeInactive: true, page: page + 1, limit: pageSize })
-        .then((result) => {
-          setCategories(result.data);
-          setTotal(result.total);
-        })
-        .catch((err) => setError(err.message)),
-    [token, page, pageSize],
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const [actionError, setActionError] = useState('');
+  const categoriesQuery = useQuery({
+    queryKey: ['categories', 'page', { page, pageSize, includeInactive: true }],
+    queryFn: () => getCategoriesRequest(token, { includeInactive: true, page: page + 1, limit: pageSize }),
+    enabled: Boolean(token),
+  });
+  const categories = categoriesQuery.data?.data ?? null;
+  const total = categoriesQuery.data?.total ?? 0;
+  const error = actionError || categoriesQuery.error?.message || '';
 
   const onDeactivate = async (id) => {
     const accepted = await confirm({
@@ -47,13 +40,10 @@ const CategoriesPage = () => {
     try {
       await deactivateCategoryRequest(id, token);
       notify('Category deactivated');
-      if (categories.length === 1 && page > 0) {
-        setPage((current) => current - 1);
-        return;
-      }
-      await load();
+      await invalidateFamilies('categories');
+      if (categories.length === 1 && page > 0) setPage((current) => current - 1);
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
     }
   };
 

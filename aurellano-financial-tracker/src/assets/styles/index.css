@@ -11,6 +11,7 @@
   --color-neutral-900: var(--neutral-900);
   --color-error-foreground: var(--error-foreground);
   --color-edit: var(--edit);
+  --color-edit-tint: var(--edit-tint);
   --color-warning: var(--warning);
   --color-warning-tint: var(--warning-tint);
   --color-destructive: var(--destructive);

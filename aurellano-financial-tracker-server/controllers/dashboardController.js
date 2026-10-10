@@ -8,6 +8,9 @@ const { balanceForAccount, debtState, debtTotals, monthRange, owedAmount, sumAmo
   require('../utils/finance');
 const { slicePage } = require('../utils/pagination');
 
+const spendableBalance = (balance, remainingBalance) =>
+  remainingBalance == null ? balance : Math.max(0, balance - remainingBalance);
+
 const getDashboard = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -15,15 +18,22 @@ const getDashboard = async (req, res) => {
     const { start, end } = monthRange(now.getUTCFullYear(), now.getUTCMonth() + 1);
     const accounts = await Account.find({ userId, isActive: true }).sort({ name: 1 });
     const accountBalances = await Promise.all(
-      accounts.map(async (account) => ({
-        id: account._id,
-        name: account.name,
-        type: account.type,
-        currency: account.currency,
-        balance: await balanceForAccount(account, { Transaction, Transfer, DebtPayment }),
-      })),
+      accounts.map(async (account) => {
+        const balance = await balanceForAccount(account, { Transaction, Transfer, DebtPayment });
+        return {
+          id: account._id,
+          name: account.name,
+          type: account.type,
+          currency: account.currency,
+          balance,
+          spendable: spendableBalance(balance, account.remainingBalance),
+        };
+      }),
     );
-    const totalMoney = accountBalances.reduce((sum, account) => sum + account.balance, 0);
+    const totalMoney = accountBalances.reduce((sum, account) => sum + account.spendable, 0);
+    accountBalances.forEach((account) => {
+      delete account.spendable;
+    });
     const accountPage = slicePage(accountBalances, req.query, 'accountPage', 'accountLimit');
     const [monthlyIncome, monthlyExpenses, debts] = await Promise.all([
       sumAmount(Transaction, {

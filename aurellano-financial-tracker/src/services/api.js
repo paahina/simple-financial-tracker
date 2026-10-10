@@ -11,15 +11,23 @@ const toQuery = (params) => {
   return query ? `?${query}` : '';
 };
 
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 const parseResponse = async (response) => {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.message || 'Request failed');
+    throw new ApiError(data.message || 'Request failed', response.status);
   }
   return data;
 };
 
-export const apiRequest = async (path, { method = 'GET', body, token } = {}) => {
+export const apiRequest = async (path, { method = 'GET', body, token, signal } = {}) => {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -27,6 +35,7 @@ export const apiRequest = async (path, { method = 'GET', body, token } = {}) => 
   const response = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
+    signal,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
@@ -42,13 +51,22 @@ export const signupRequest = (payload) =>
 export const logoutRequest = (token) =>
   apiRequest('/api/users/logout', { method: 'POST', token });
 
-export const sessionRequest = (token) => apiRequest('/api/users/session', { token });
+export const sessionRequest = (token, { signal } = {}) =>
+  apiRequest('/api/users/session', { token, signal });
 
 export const getDashboardRequest = (token, accountPage = 1, accountLimit = 10) =>
   apiRequest(`/api/dashboard/get${toQuery({ accountPage, accountLimit })}`, { token });
 
-export const getAccountsRequest = (token, { page, limit } = {}) =>
-  apiRequest(`/api/accounts/getAllAccounts${toQuery({ page, limit })}`, { token });
+export const getAccountsRequest = (token, { page, limit, activeOnly, isActive } = {}) =>
+  apiRequest(
+    `/api/accounts/getAllAccounts${toQuery({
+      page,
+      limit,
+      activeOnly: activeOnly ? 'true' : undefined,
+      isActive: isActive === undefined ? undefined : String(isActive),
+    })}`,
+    { token },
+  );
 
 export const getAccountRequest = (id, token) => apiRequest(`/api/accounts/get/${id}`, { token });
 
@@ -60,6 +78,12 @@ export const updateAccountRequest = (id, payload, token) =>
 
 export const deactivateAccountRequest = (id, token) =>
   apiRequest(`/api/accounts/delete/${id}`, { method: 'DELETE', token });
+
+export const reactivateAccountRequest = (id, token) =>
+  apiRequest(`/api/accounts/reactivate/${id}`, { method: 'PUT', token });
+
+export const deleteAccountRequest = (id, token) =>
+  apiRequest(`/api/accounts/remove/${id}`, { method: 'DELETE', token });
 
 export const getCategoriesRequest = (token, { type, includeInactive, page, limit } = {}) =>
   apiRequest(

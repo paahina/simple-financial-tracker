@@ -1,10 +1,13 @@
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button, { editLinkClass } from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
+import { transactionTypeOptions } from '../../components/TransactionTypeChip';
 import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import {
   createTransactionRequest,
@@ -29,9 +32,7 @@ const TransactionCreatePage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
   const navigate = useNavigate();
-  const [accounts, setAccounts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [dateError, setDateError] = useState('');
   const [transactionDate, setTransactionDate] = useState(nowDatetimeLocal());
@@ -39,14 +40,19 @@ const TransactionCreatePage = () => {
   const [saving, setSaving] = useState(false);
   const cardRowRef = useRef(null);
 
-  useEffect(() => {
-    Promise.all([getAccountsRequest(token), getCategoriesRequest(token)])
-      .then(([accountList, categoryList]) => {
-        setAccounts(accountList.filter((account) => account.isActive));
-        setCategories(categoryList);
-      })
-      .catch((err) => setError(err.message));
-  }, [token]);
+  const accountsQuery = useQuery({
+    queryKey: ['accounts', 'options', { activeOnly: true }],
+    queryFn: () => getAccountsRequest(token, { activeOnly: true }),
+    enabled: Boolean(token),
+  });
+  const categoriesQuery = useQuery({
+    queryKey: ['categories', 'options', { type: 'all', includeInactive: false }],
+    queryFn: () => getCategoriesRequest(token),
+    enabled: Boolean(token),
+  });
+  const accounts = accountsQuery.data ?? [];
+  const categories = categoriesQuery.data ?? [];
+  const error = actionError || accountsQuery.error?.message || categoriesQuery.error?.message || '';
 
   useEffect(() => {
     const node = cardRowRef.current;
@@ -73,7 +79,7 @@ const TransactionCreatePage = () => {
     setDateError(nextDateError);
     setFieldErrors(nextErrors);
     if (nextDateError || drafts.some((row) => hasErrors(nextErrors[row.key]))) return;
-    setError('');
+    setActionError('');
     setSaving(true);
     const pending = [...drafts];
     let saved = 0;
@@ -93,11 +99,12 @@ const TransactionCreatePage = () => {
         saved += 1;
         pending.shift();
       }
+      await invalidateFamilies('transactions', 'dashboard', 'accounts', 'reports');
       notify(saved === 1 ? 'Transaction saved' : `${saved} transactions saved`);
       navigate('/transactions');
     } catch (err) {
       setDrafts(pending.length ? pending : [blankRow()]);
-      setError(saved ? `${saved} saved. ${err.message}` : err.message);
+      setActionError(saved ? `${saved} saved. ${err.message}` : err.message);
     } finally {
       setSaving(false);
     }
@@ -138,10 +145,7 @@ const TransactionCreatePage = () => {
                 <Field label="Type">
                   <Select
                     value={row.type}
-                    options={[
-                      { value: 'EXPENSE', label: 'Expense' },
-                      { value: 'INCOME', label: 'Income' },
-                    ]}
+                    options={transactionTypeOptions}
                     onChange={(type) => updateDraft(row.key, { type, categoryId: '' })}
                   />
                 </Field>
@@ -209,10 +213,7 @@ const TransactionCreatePage = () => {
                     <td className="px-2 py-2">
                       <Select
                         value={row.type}
-                        options={[
-                          { value: 'EXPENSE', label: 'Expense' },
-                          { value: 'INCOME', label: 'Income' },
-                        ]}
+                        options={transactionTypeOptions}
                         onChange={(type) => updateDraft(row.key, { type, categoryId: '' })}
                       />
                     </td>

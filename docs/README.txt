@@ -17,12 +17,21 @@ Recommended reading order:
 12. 12_storage_management.txt
 13. 13_frontend_development_plan.txt
 14. 14_backend_development_plan.txt
+15. 15_caching_rules.txt
+
+Working backlog (temporary; not part of numbered spec set):
+- backlog/README.txt
+- backlog/implementation_tasks.txt
 
 Implementation references:
 - 13_frontend_development_plan.txt is the detailed frontend folder, module, layout,
   routing, state, and User/Admin UI/UX plan.
 - 14_backend_development_plan.txt is the detailed backend MVC + Service Layer plan,
   including folder structure and responsibilities.
+- 15_caching_rules.txt defines client + Redis + MongoDB read caching, TTL, and
+  write-time invalidation for financial data.
+- backlog/implementation_tasks.txt is the actionable checklist (may be replaced);
+  see backlog/README.txt.
 
 Core locked decisions:
 - MERN
