@@ -1,20 +1,27 @@
+import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import BelowRemainingChip from '../../components/BelowRemainingChip';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
 import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
-import { getAccountRequest, updateAccountRequest } from '../../services/api';
+import { deleteAccountRequest, getAccountRequest, updateAccountRequest } from '../../services/api';
+import { belowRemainingBalance } from '../../utils/accounts';
 import { fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, optionalAmount, requiredText } from '../../utils/validate';
+
+const remainingCentavos = (value) => (value === '' || value == null ? null : toCentavos(value));
 
 const AccountEditPage = () => {
   const { id } = useParams();
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
   const [baseline, setBaseline] = useState('');
@@ -30,6 +37,7 @@ const AccountEditPage = () => {
           name: account.name,
           type: account.type,
           currentAmount: fromCentavos(account.balance),
+          remainingBalance: account.remainingBalance == null ? '' : fromCentavos(account.remainingBalance),
           description: account.description || '',
         };
         setForm(nextForm);
@@ -48,6 +56,7 @@ const AccountEditPage = () => {
     const nextErrors = {
       name: requiredText(form.name, 'Name', 2),
       currentAmount: optionalAmount(form.currentAmount, 'Current amount'),
+      remainingBalance: optionalAmount(form.remainingBalance, 'Remaining balance'),
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
@@ -59,11 +68,31 @@ const AccountEditPage = () => {
           name: form.name,
           type: form.type,
           currentBalance: toCentavos(form.currentAmount || 0),
+          remainingBalance: remainingCentavos(form.remainingBalance),
           description: form.description,
         },
         token,
       );
       notify('Account updated');
+      navigate('/accounts');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const onDelete = async () => {
+    const accepted = await confirm({
+      title: 'Delete account?',
+      message: 'This removes the account. An account with transactions, transfers, or debt payments cannot be deleted.',
+      confirmLabel: 'Delete',
+      confirmVariant: 'danger',
+      confirmIcon: Trash2,
+    });
+    if (!accepted) return;
+    setError('');
+    try {
+      await deleteAccountRequest(id, token);
+      notify('Account deleted');
       navigate('/accounts');
     } catch (err) {
       setError(err.message);
@@ -97,10 +126,21 @@ const AccountEditPage = () => {
       <Field label="Current amount (PHP)" error={fieldErrors.currentAmount}>
         <input className={inputClass} type="number" min="0" step="0.01" value={form.currentAmount} onChange={(event) => setForm({ ...form, currentAmount: event.target.value })} />
       </Field>
+      <Field label="Remaining balance (PHP)" error={fieldErrors.remainingBalance}>
+        <input className={inputClass} type="number" min="0" step="0.01" value={form.remainingBalance} onChange={(event) => setForm({ ...form, remainingBalance: event.target.value })} />
+      </Field>
+      {belowRemainingBalance(toCentavos(form.currentAmount || 0), remainingCentavos(form.remainingBalance)) && (
+        <BelowRemainingChip />
+      )}
       <Field label="Description">
         <input className={inputClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
       </Field>
-      <Button onClick={onSubmit}>Save changes</Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={onSubmit}>Save changes</Button>
+        <Button variant="danger" icon={Trash2} onClick={onDelete}>
+          Delete
+        </Button>
+      </div>
     </form>
       )}
     </FormModal>

@@ -24,8 +24,8 @@ const DebtPaymentCreatePage = () => {
   const closeTo = `/debts/${id}?tab=payments`;
 
   useEffect(() => {
-    getAccountsRequest(token)
-      .then((accountList) => setAccounts(accountList.filter((account) => account.isActive)))
+    getAccountsRequest(token, { activeOnly: true })
+      .then(setAccounts)
       .catch((err) => setError(err.message));
   }, [token]);
 

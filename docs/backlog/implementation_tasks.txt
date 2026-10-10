@@ -38,19 +38,19 @@ PRIORITY B — Accounts: Active / Deactivated tabs
 ----------------------------------------------------------------------
 
 B1. Accounts page tabs (like Debts status tabs)
-    [ ] Tabs: Active (default), Deactivated.
-    [ ] URL: ?tab=deactivated (Active has no query or ?tab=active).
-    [ ] Server: paged getAllAccounts supports isActive filter OR client filter
+    [x] Tabs: Active (default), Deactivated.
+    [x] URL: ?tab=deactivated (Active has no query or ?tab=active).
+    [x] Server: paged getAllAccounts supports isActive filter OR client filter
         with correct total counts for each tab (prefer server filter + counts).
-    [ ] Skeleton on tab switch when a new request runs.
+    [x] Skeleton on tab switch when a new request runs.
     Files: AccountsPage.jsx, accountController.js, api.js, tests if shape changes.
 
 B2. Deactivated accounts excluded from money forms
     Server already blocks inactive on transaction/transfer/payment writes.
-    [ ] Dropdowns: getAccountsRequest for create/edit transaction, transfer,
+    [x] Dropdowns: getAccountsRequest for create/edit transaction, transfer,
         debt payment — only isActive true (query param or client filter on
         unpaginated list).
-    [ ] Edit forms loading inactive account for old records: still show
+    [x] Edit forms loading inactive account for old records: still show
         selected account if editing historical row (read-only label or allow
         display but block change to inactive for new picks).
     Files: TransactionCreate/Edit, TransferCreate/Edit, DebtPayment pages,
@@ -58,14 +58,14 @@ B2. Deactivated accounts excluded from money forms
 
 B3. Optional / zero balance on create and edit
     Verify (mostly implemented):
-    [ ] Create: empty current amount -> 0 centavos (optionalAmount, min 0).
-    [ ] Edit: same; reject negative only.
-    [ ] No HTML min="0.01" on account amount fields.
+    [x] Create: empty current amount -> 0 centavos (optionalAmount, min 0).
+    [x] Edit: same; reject negative only.
+    [x] No HTML min="0.01" on account amount fields.
     QA: Create account with 0; edit to 0; negative rejected.
 
 B4. Reactivate account (optional follow-up)
     Not in original deactivate-only scope.
-    [ ] If product wants Deactivated tab actions: PUT reactivate isActive true
+    [x] If product wants Deactivated tab actions: PUT reactivate isActive true
         with rules (no duplicate names, etc.).
 
 ----------------------------------------------------------------------

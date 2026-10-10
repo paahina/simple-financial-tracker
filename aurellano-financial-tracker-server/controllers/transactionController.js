@@ -91,7 +91,9 @@ const updateTransaction = async (req, res) => {
     const nextType = req.body.type || transaction.type;
     const nextAccountId = req.body.accountId || transaction.accountId;
     const nextCategoryId = req.body.categoryId || transaction.categoryId;
-    await requireOwnedAccount(Account, req.user.id, nextAccountId, { active: true });
+    await requireOwnedAccount(Account, req.user.id, nextAccountId, {
+      active: String(nextAccountId) !== String(transaction.accountId),
+    });
     await requireCategory(req.user.id, nextCategoryId, nextType);
     if (req.body.accountId !== undefined) transaction.accountId = req.body.accountId;
     if (req.body.type !== undefined) transaction.type = req.body.type;

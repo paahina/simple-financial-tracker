@@ -59,6 +59,7 @@ const accountValidation = [
   body('name').isString().trim().isLength({ min: 2, max: 100 }),
   body('type').isIn(['CASH', 'E_WALLET', 'BANK']),
   body('initialBalance').optional().isInt({ min: 0 }),
+  body('remainingBalance').optional({ nullable: true }).isInt({ min: 0 }),
   body('currency').optional().isString().trim().isLength({ min: 3, max: 3 }),
   body('description').optional().isString().trim(),
   handleValidation,
@@ -70,6 +71,7 @@ const accountUpdateValidation = [
   body('currency').optional().isString().trim().isLength({ min: 3, max: 3 }),
   body('description').optional().isString().trim(),
   body('currentBalance').optional().isInt({ min: 0 }),
+  body('remainingBalance').optional({ nullable: true }).isInt({ min: 0 }),
   handleValidation,
 ];
 

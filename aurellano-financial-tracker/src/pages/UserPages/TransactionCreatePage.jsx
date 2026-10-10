@@ -40,9 +40,9 @@ const TransactionCreatePage = () => {
   const cardRowRef = useRef(null);
 
   useEffect(() => {
-    Promise.all([getAccountsRequest(token), getCategoriesRequest(token)])
+    Promise.all([getAccountsRequest(token, { activeOnly: true }), getCategoriesRequest(token)])
       .then(([accountList, categoryList]) => {
-        setAccounts(accountList.filter((account) => account.isActive));
+        setAccounts(accountList);
         setCategories(categoryList);
       })
       .catch((err) => setError(err.message));

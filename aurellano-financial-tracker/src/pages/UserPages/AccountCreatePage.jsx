@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import BelowRemainingChip from '../../components/BelowRemainingChip';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
@@ -8,10 +9,13 @@ import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { createAccountRequest } from '../../services/api';
+import { belowRemainingBalance } from '../../utils/accounts';
 import { toCentavos } from '../../utils/format';
 import { hasErrors, optionalAmount, requiredText } from '../../utils/validate';
 
-const emptyForm = { name: '', type: 'CASH', initialBalance: '' };
+const emptyForm = { name: '', type: 'CASH', initialBalance: '', remainingBalance: '' };
+
+const remainingCentavos = (value) => (value === '' || value == null ? null : toCentavos(value));
 
 const AccountCreatePage = () => {
   const { token } = useAuth();
@@ -27,6 +31,7 @@ const AccountCreatePage = () => {
     const nextErrors = {
       name: requiredText(form.name, 'Name', 2),
       initialBalance: optionalAmount(form.initialBalance, 'Current amount'),
+      remainingBalance: optionalAmount(form.remainingBalance, 'Remaining balance'),
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
@@ -37,6 +42,7 @@ const AccountCreatePage = () => {
           name: form.name,
           type: form.type,
           initialBalance: toCentavos(form.initialBalance || 0),
+          remainingBalance: remainingCentavos(form.remainingBalance),
           currency: 'PHP',
           description: '',
         },
@@ -86,6 +92,19 @@ const AccountCreatePage = () => {
             onChange={(event) => setForm({ ...form, initialBalance: event.target.value })}
           />
         </Field>
+        <Field label="Remaining balance (PHP)" error={fieldErrors.remainingBalance}>
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.remainingBalance}
+            onChange={(event) => setForm({ ...form, remainingBalance: event.target.value })}
+          />
+        </Field>
+        {belowRemainingBalance(toCentavos(form.initialBalance || 0), remainingCentavos(form.remainingBalance)) && (
+          <BelowRemainingChip />
+        )}
         <Button onClick={onSubmit}>Save account</Button>
       </form>
     </FormModal>

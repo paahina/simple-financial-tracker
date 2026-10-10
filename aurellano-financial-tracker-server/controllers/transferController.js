@@ -119,10 +119,14 @@ const updateTransfer = async (req, res) => {
       recipientName: req.body.recipientName !== undefined ? req.body.recipientName : transfer.recipientName,
     });
     if (parties.from.accountId) {
-      await requireOwnedAccount(Account, req.user.id, parties.from.accountId, { active: true });
+      await requireOwnedAccount(Account, req.user.id, parties.from.accountId, {
+        active: String(parties.from.accountId) !== String(transfer.fromAccountId || ''),
+      });
     }
     if (parties.to.accountId) {
-      await requireOwnedAccount(Account, req.user.id, parties.to.accountId, { active: true });
+      await requireOwnedAccount(Account, req.user.id, parties.to.accountId, {
+        active: String(parties.to.accountId) !== String(transfer.toAccountId || ''),
+      });
     }
     transfer.set('fromAccountId', parties.from.accountId || undefined);
     transfer.senderName = parties.from.name;

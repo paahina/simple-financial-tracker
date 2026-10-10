@@ -35,8 +35,8 @@ const TransferCreatePage = () => {
   const cardRowRef = useRef(null);
 
   useEffect(() => {
-    getAccountsRequest(token)
-      .then((accountList) => setActiveAccounts(accountList.filter((account) => account.isActive)))
+    getAccountsRequest(token, { activeOnly: true })
+      .then(setActiveAccounts)
       .catch((err) => setError(err.message));
   }, [token]);
 

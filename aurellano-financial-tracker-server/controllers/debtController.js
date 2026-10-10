@@ -252,7 +252,9 @@ const updateDebtPayment = async (req, res) => {
     }
     const debt = await requireDebt(req.user.id, payment.debtId);
     const nextAccountId = req.body.accountId || payment.accountId;
-    await requireOwnedAccount(Account, req.user.id, nextAccountId, { active: true });
+    await requireOwnedAccount(Account, req.user.id, nextAccountId, {
+      active: String(nextAccountId) !== String(payment.accountId),
+    });
     const paid = await debtTotals(DebtPayment, debt._id);
     const nextAmount = req.body.amount !== undefined ? Number(req.body.amount) : payment.amount;
     const remainingWithoutThis = owedAmount(debt) - (paid - payment.amount);

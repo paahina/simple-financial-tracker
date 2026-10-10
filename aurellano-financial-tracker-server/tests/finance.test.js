@@ -212,6 +212,61 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
     .set(auth(token));
   assert.equal(badZone.status, 400);
 
+  const limited = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Limited',
+    type: 'CASH',
+    initialBalance: 10000,
+    remainingBalance: 50000,
+  });
+  assert.equal(limited.status, 201);
+  assert.equal(limited.body.account.remainingBalance, 50000);
+  assert.equal(limited.body.account.balance < limited.body.account.remainingBalance, true);
+
+  const cleared = await request(app)
+    .put(`/api/accounts/update/${limited.body.account._id}`)
+    .set(auth(token))
+    .send({ remainingBalance: null });
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.body.remainingBalance, null);
+
+  const negativeRemaining = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Negative remaining',
+    type: 'CASH',
+    remainingBalance: -1,
+  });
+  assert.equal(negativeRemaining.status, 400);
+
+  const spare = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Spare',
+    type: 'CASH',
+    initialBalance: 0,
+  });
+  assert.equal(spare.status, 201);
+  const sameName = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Spare',
+    type: 'E_WALLET',
+    initialBalance: 0,
+  });
+  assert.equal(sameName.status, 201);
+
+  const deactivated = await request(app)
+    .delete(`/api/accounts/delete/${spare.body.account._id}`)
+    .set(auth(token));
+  assert.equal(deactivated.status, 200);
+  assert.equal(deactivated.body.account.isActive, false);
+
+  const reactivated = await request(app)
+    .put(`/api/accounts/reactivate/${spare.body.account._id}`)
+    .set(auth(token));
+  assert.equal(reactivated.status, 200);
+  assert.equal(reactivated.body.account.isActive, true);
+
+  const alreadyActive = await request(app)
+    .put(`/api/accounts/reactivate/${spare.body.account._id}`)
+    .set(auth(token));
+  assert.equal(alreadyActive.status, 200);
+  assert.equal(alreadyActive.body.account.isActive, true);
+
   const other = await register('other@example.com');
   const hidden = await request(app)
     .get(`/api/accounts/get/${cash.body.account._id}`)

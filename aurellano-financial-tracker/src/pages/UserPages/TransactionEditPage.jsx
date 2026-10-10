@@ -13,6 +13,7 @@ import {
   getTransactionRequest,
   updateTransactionRequest,
 } from '../../services/api';
+import { accountOption, selectableAccounts } from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
@@ -37,7 +38,7 @@ const TransactionEditPage = () => {
     ])
       .then(([transaction, accountList, categoryList]) => {
         if (!active) return;
-        setAccounts(accountList.filter((account) => account.isActive));
+        setAccounts(selectableAccounts(accountList, [transaction.accountId]));
         setCategories(categoryList);
         const nextForm = {
           accountId: transaction.accountId,
@@ -102,7 +103,7 @@ const TransactionEditPage = () => {
       <Field label="Account" error={fieldErrors.accountId}>
         <Select
           value={form.accountId}
-          options={accounts.map((account) => ({ value: account._id, label: account.name }))}
+          options={accounts.map(accountOption)}
           onChange={(accountId) => setForm({ ...form, accountId })}
         />
       </Field>

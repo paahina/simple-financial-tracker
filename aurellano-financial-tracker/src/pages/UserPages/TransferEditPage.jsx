@@ -8,6 +8,7 @@ import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { getAccountsRequest, getTransferRequest, updateTransferRequest } from '../../services/api';
+import { accountOption, selectableAccounts } from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
@@ -27,7 +28,7 @@ const TransferEditPage = () => {
     Promise.all([getTransferRequest(id, token), getAccountsRequest(token)])
       .then(([transfer, accountList]) => {
         if (!active) return;
-        setAccounts(accountList.filter((account) => account.isActive));
+        setAccounts(selectableAccounts(accountList, [transfer.fromAccountId, transfer.toAccountId]));
         const nextForm = {
           fromAccountId: transfer.fromAccountId || 'other',
           senderName: transfer.senderName || '',
@@ -98,7 +99,7 @@ const TransferEditPage = () => {
         <Select
           value={form.fromAccountId}
           options={[
-            ...accounts.map((account) => ({ value: account._id, label: account.name })),
+            ...accounts.map(accountOption),
             { value: 'other', label: 'From other' },
           ]}
           onChange={(fromAccountId) => setForm({ ...form, fromAccountId })}
@@ -119,7 +120,7 @@ const TransferEditPage = () => {
         <Select
           value={form.toAccountId}
           options={[
-            ...accounts.map((account) => ({ value: account._id, label: account.name })),
+            ...accounts.map(accountOption),
             { value: 'other', label: 'To other' },
           ]}
           onChange={(toAccountId) => setForm({ ...form, toAccountId })}
