@@ -9,3 +9,6 @@ Stable reference docs stay in docs/ (e.g. 15_caching_rules.txt).
 
 Current file:
 - implementation_tasks.txt — active implementation checklist
+
+
+git switch production; git merge development;git switch development; git push origin --all
