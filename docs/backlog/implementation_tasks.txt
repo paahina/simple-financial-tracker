@@ -4,7 +4,7 @@ Implementation Tasks (Backlog from recent planning)
 
 Location: docs/backlog/ — working file; may be updated or overridden.
 
-This file tracks agreed work not yet fully implemented.
+This file tracks agreed work. G1 and H1–H3 are implemented; H4 is still open.
 
 Use checkboxes when executing: [ ] todo  [x] done
 
@@ -17,23 +17,23 @@ G1. Optional “also record as income” on debt payment create/edit
     not appear as INCOME in transaction lists / income reporting unless
     duplicated manually.
     Agreed behavior:
-    [ ] On Record payment (and edit): optional checkbox, e.g. “Also record as
+    [x] On Record payment (and edit): optional checkbox, e.g. “Also record as
         income”. NOT a transfer — only DebtPayment + Transaction type INCOME.
-    [ ] When checked on save: create two separate objects in one action:
+    [x] When checked on save: create two separate objects in one action:
         (1) DebtPayment — unchanged role (debt remaining, account, amount,
             paymentDate, notes).
         (2) Transaction — type INCOME, same accountId, same amount, same
             date; user supplies income categoryId and label (notes may copy
             to description). Two Mongo documents, one user submit.
-    [ ] When unchecked: only DebtPayment (current behavior).
-    [ ] Link records (e.g. transactionId on DebtPayment or debtPaymentId on
+    [x] When unchecked: only DebtPayment (current behavior).
+    [x] Link records (e.g. transactionId on DebtPayment or debtPaymentId on
         Transaction) so balance is not double-counted: account balance counts
         the money once (prefer INCOME transaction; exclude linked payment from
         debtPayments sum in balanceForAccount). Debt remaining still sums all
         DebtPayment amounts.
-    [ ] Update/delete payment: keep linked transaction in sync (amount, date,
-        account, category/label rules); delete one policy TBD (delete both or
-        unlink with warning).
+    [x] Update/delete payment: keep linked transaction in sync (amount, date,
+        account, category/label). Deleting the payment deletes the linked
+        income too; the income row cannot be edited from Transactions.
     Files: debtPaymentModel.js, debtController.js, transactionController.js
            or shared service, finance.js (balanceForAccount), validationMiddleware,
            DebtPaymentCreatePage.jsx, PaymentEditPage.jsx, api.js.
@@ -49,35 +49,34 @@ H1. Data model and account CRUD for sub-balances
     Problem: User wants named slices of one account balance (e.g. BPI total
     PHP 3,500 with “Savings” PHP 200 and more labels), not separate accounts.
     Agreed behavior:
-    [ ] Per account: zero or more sub-balances { label (user text), amount in
-        centavos }. Multiple labels per account. Slice amounts are portions OF
-        the real account balance, not extra money.
-    [ ] Manage on account create/edit (add/rename/remove rows; validate
-        amounts non-negative; sum of slices <= account balance, or require
-        full allocation — decide at implement time).
-    [ ] Distinct from remainingBalance (low-balance alert threshold).
+    [x] Per account: at least one sub-balance (default label “Current”).
+        Account total is the sum of pockets. Current amount on create/edit is
+        read-only. Remaining-balance chip still uses that total.
+    [x] Manage on account create/edit (add/rename/remove rows; cannot remove
+        the last row). Lazy backfill Current on read for older accounts.
+    [x] Distinct from remainingBalance (low-balance alert threshold).
     Files: accountModel.js, accountController.js, AccountCreatePage.jsx,
            AccountEditPage.jsx, AccountsPage.jsx (optional breakdown display).
 
 H2. Transactions use sub-balance when account has envelopes
-    [ ] After user picks Account on transaction create/edit: if that account
+    [x] After user picks Account on transaction create/edit: if that account
         has sub-balances, require picker — “Deduct from” / “Add to” pocket.
-    [ ] EXPENSE: decrease chosen sub-balance by amount; account balance logic
+    [x] EXPENSE: decrease chosen sub-balance by amount; account balance logic
         unchanged (existing Transaction rules).
-    [ ] INCOME: increase chosen sub-balance by amount.
-    [ ] Account with no sub-balances: no extra field (current UX).
-    [ ] Store subBalanceId (or equivalent) on Transaction; validate slice
+    [x] INCOME: increase chosen sub-balance by amount.
+    [x] Account with no sub-balances: no extra field (current UX).
+    [x] Store subBalanceId (or equivalent) on Transaction; validate slice
         balance on expense; reverse/adjust on edit/delete.
     Files: transactionModel.js, transactionController.js, finance helpers,
            TransactionCreatePage.jsx, TransactionEditPage.jsx.
 
 H3. Transfers use sub-balance on from/to your accounts
-    [ ] On transfer create/edit: when From is your account with sub-balances,
+    [x] On transfer create/edit: when From is your account with sub-balances,
         pick source pocket; when To is your account with sub-balances, pick
         destination pocket.
-    [ ] Same account, different pockets allowed (reallocate inside account).
-    [ ] “Other” external sender/recipient sides: no sub-balance picker.
-    [ ] Store fromSubBalanceId / toSubBalanceId on Transfer where applicable;
+    [x] Same account, different pockets allowed (reallocate inside account).
+    [x] “Other” external sender/recipient sides: no sub-balance picker.
+    [x] Store fromSubBalanceId / toSubBalanceId on Transfer where applicable;
         validate source slice has enough; update both slices; total account
         balance unchanged for internal moves.
     Files: transferModel.js, transferController.js, TransferCreatePage.jsx,

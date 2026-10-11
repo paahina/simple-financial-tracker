@@ -16,7 +16,8 @@ import {
   getTransactionRequest,
   updateTransactionRequest,
 } from '../../services/api';
-import { accountOption, selectableAccounts } from '../../utils/accounts';
+import SubBalanceSelect from '../../components/SubBalanceSelect';
+import { accountById, accountOption, pocketIdForAccount, pocketOptions, selectableAccounts } from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
@@ -51,6 +52,7 @@ const TransactionEditPage = () => {
           amount: fromCentavos(transaction.amount),
           label: transaction.label,
           categoryId: transaction.categoryId,
+          subBalanceId: transaction.subBalanceId || '',
           transactionDate: datetimeLocalInput(transaction.transactionDate),
         };
         setForm(nextForm);
@@ -77,6 +79,9 @@ const TransactionEditPage = () => {
       label: requiredText(form.label, 'Label'),
       amount: requiredAmount(form.amount),
       transactionDate: requiredChoice(form.transactionDate, 'Date'),
+      subBalanceId: pocketOptions(accountById(accounts, form.accountId)).length
+        ? requiredChoice(form.subBalanceId, 'Sub-balance')
+        : '',
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
@@ -89,6 +94,7 @@ const TransactionEditPage = () => {
             ...form,
             amount: toCentavos(form.amount),
             transactionDate: datetimeLocalToIso(form.transactionDate),
+            subBalanceId: form.subBalanceId || null,
           },
           token,
         );
@@ -115,9 +121,18 @@ const TransactionEditPage = () => {
         <Select
           value={form.accountId}
           options={accounts.map(accountOption)}
-          onChange={(accountId) => setForm({ ...form, accountId })}
+          onChange={(accountId) =>
+            setForm({ ...form, accountId, subBalanceId: pocketIdForAccount(accounts, accountId) })
+          }
         />
       </Field>
+      <SubBalanceSelect
+        account={accountById(accounts, form.accountId)}
+        value={form.subBalanceId}
+        error={fieldErrors.subBalanceId}
+        onChange={(subBalanceId) => setForm({ ...form, subBalanceId })}
+        label={form.type === 'INCOME' ? 'Add to' : 'Deduct from'}
+      />
       <Field label="Type">
         <Select
           value={form.type}

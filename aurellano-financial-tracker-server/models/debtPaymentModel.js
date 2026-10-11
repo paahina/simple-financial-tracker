@@ -8,6 +8,7 @@ const debtPaymentSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 1 },
     paymentDate: { type: Date, required: true },
     notes: { type: String, trim: true, default: '' },
+    transactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction', default: null },
   },
   { timestamps: true },
 );

@@ -15,6 +15,7 @@ import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { deactivateAccountRequest, getAccountsRequest, reactivateAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
+import { formatPeso } from '../../utils/format';
 
 const emptyCounts = { active: 0, deactivated: 0 };
 
@@ -118,6 +119,15 @@ const AccountsPage = () => {
               <AccountTypeChip type={account.type} />
             </span>
             <Money className="mt-2 block text-primary-shade" centavos={account.balance} />
+            {account.subBalances?.length ? (
+              <ul className="mt-2 space-y-1 text-sm text-neutral-500">
+                {account.subBalances.map((item) => (
+                  <li key={item._id}>
+                    {item.label}: {formatPeso(item.amount)}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {belowRemainingBalance(account.balance, account.remainingBalance) && (
               <span className="mt-2">
                 <BelowRemainingChip />

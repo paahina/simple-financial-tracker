@@ -2,15 +2,16 @@ const { Types } = require('mongoose');
 const Transfer = require('../models/transferModel');
 const Account = require('../models/accountModel');
 const { HttpStatus } = require('../config/constants');
-const { FinanceError, requireOwnedAccount, sendFinanceError } = require('../utils/finance');
+const {
+  FinanceError,
+  applyTransferPockets,
+  assertTransferTargets,
+  requireOwnedAccount,
+  resolvePocketId,
+  sendFinanceError,
+} = require('../utils/finance');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
 const { listActivityDays } = require('../utils/dayGroups');
-
-const assertDifferentAccounts = (fromAccountId, toAccountId) => {
-  if (String(fromAccountId) === String(toAccountId)) {
-    throw new FinanceError('Source and destination accounts must be different');
-  }
-};
 
 const resolveParty = (accountId, name, missingMessage) => {
   const id = accountId || null;
@@ -30,10 +31,23 @@ const resolveParties = ({ fromAccountId, senderName, toAccountId, recipientName 
   if (!from.accountId && !to.accountId) {
     throw new FinanceError('One side must be one of your accounts');
   }
-  if (from.accountId && to.accountId) {
-    assertDifferentAccounts(from.accountId, to.accountId);
-  }
   return { from, to };
+};
+
+const pocketFor = (account, requestedId) => resolvePocketId(account, requestedId || null);
+
+const loadTransferAccounts = async (userId, parties, previous = {}) => {
+  const fromAccount = parties.from.accountId
+    ? await requireOwnedAccount(Account, userId, parties.from.accountId, {
+        active: String(parties.from.accountId) !== String(previous.fromAccountId || ''),
+      })
+    : null;
+  const toAccount = parties.to.accountId
+    ? await requireOwnedAccount(Account, userId, parties.to.accountId, {
+        active: String(parties.to.accountId) !== String(previous.toAccountId || ''),
+      })
+    : null;
+  return { fromAccount, toAccount };
 };
 
 const getTransferDays = async (req, res) => {
@@ -84,19 +98,21 @@ const getTransferById = async (req, res) => {
 const createTransfer = async (req, res) => {
   try {
     const parties = resolveParties(req.body);
-    if (parties.from.accountId) {
-      await requireOwnedAccount(Account, req.user.id, parties.from.accountId, { active: true });
-    }
-    if (parties.to.accountId) {
-      await requireOwnedAccount(Account, req.user.id, parties.to.accountId, { active: true });
-    }
+    const { fromAccount, toAccount } = await loadTransferAccounts(req.user.id, parties);
+    const fromSubBalanceId = pocketFor(fromAccount, req.body.fromSubBalanceId || null);
+    const toSubBalanceId = pocketFor(toAccount, req.body.toSubBalanceId || null);
+    assertTransferTargets(fromAccount, fromSubBalanceId, toAccount, toSubBalanceId);
+    const amount = Number(req.body.amount);
+    await applyTransferPockets(fromAccount, fromSubBalanceId, toAccount, toSubBalanceId, amount, 1);
     const transfer = await Transfer.create({
       userId: req.user.id,
       fromAccountId: parties.from.accountId || undefined,
+      fromSubBalanceId,
       senderName: parties.from.name,
       toAccountId: parties.to.accountId || undefined,
+      toSubBalanceId,
       recipientName: parties.to.name,
-      amount: Number(req.body.amount),
+      amount,
       description: req.body.description || '',
       transactionDate: new Date(req.body.transactionDate),
     });
@@ -118,21 +134,43 @@ const updateTransfer = async (req, res) => {
       toAccountId: req.body.toAccountId !== undefined ? req.body.toAccountId : transfer.toAccountId,
       recipientName: req.body.recipientName !== undefined ? req.body.recipientName : transfer.recipientName,
     });
-    if (parties.from.accountId) {
-      await requireOwnedAccount(Account, req.user.id, parties.from.accountId, {
-        active: String(parties.from.accountId) !== String(transfer.fromAccountId || ''),
-      });
-    }
-    if (parties.to.accountId) {
-      await requireOwnedAccount(Account, req.user.id, parties.to.accountId, {
-        active: String(parties.to.accountId) !== String(transfer.toAccountId || ''),
-      });
-    }
+    const previousFrom = await (transfer.fromAccountId
+      ? requireOwnedAccount(Account, req.user.id, transfer.fromAccountId)
+      : Promise.resolve(null));
+    const previousTo =
+      transfer.toAccountId && String(transfer.toAccountId) === String(transfer.fromAccountId)
+        ? previousFrom
+        : transfer.toAccountId
+          ? await requireOwnedAccount(Account, req.user.id, transfer.toAccountId)
+          : null;
+    await applyTransferPockets(
+      previousFrom,
+      transfer.fromSubBalanceId,
+      previousTo,
+      transfer.toSubBalanceId,
+      transfer.amount,
+      -1,
+    );
+    const { fromAccount, toAccount } = await loadTransferAccounts(req.user.id, parties, {
+      fromAccountId: transfer.fromAccountId,
+      toAccountId: transfer.toAccountId,
+    });
+    const nextFromSub =
+      req.body.fromSubBalanceId !== undefined ? req.body.fromSubBalanceId || null : transfer.fromSubBalanceId;
+    const nextToSub =
+      req.body.toSubBalanceId !== undefined ? req.body.toSubBalanceId || null : transfer.toSubBalanceId;
+    const fromSubBalanceId = pocketFor(fromAccount, nextFromSub);
+    const toSubBalanceId = pocketFor(toAccount, nextToSub);
+    assertTransferTargets(fromAccount, fromSubBalanceId, toAccount, toSubBalanceId);
+    const nextAmount = req.body.amount !== undefined ? Number(req.body.amount) : transfer.amount;
+    await applyTransferPockets(fromAccount, fromSubBalanceId, toAccount, toSubBalanceId, nextAmount, 1);
     transfer.set('fromAccountId', parties.from.accountId || undefined);
+    transfer.fromSubBalanceId = fromSubBalanceId;
     transfer.senderName = parties.from.name;
     transfer.set('toAccountId', parties.to.accountId || undefined);
+    transfer.toSubBalanceId = toSubBalanceId;
     transfer.recipientName = parties.to.name;
-    if (req.body.amount !== undefined) transfer.amount = Number(req.body.amount);
+    if (req.body.amount !== undefined) transfer.amount = nextAmount;
     if (req.body.description !== undefined) transfer.description = req.body.description;
     if (req.body.transactionDate !== undefined) {
       transfer.transactionDate = new Date(req.body.transactionDate);
@@ -146,13 +184,28 @@ const updateTransfer = async (req, res) => {
 
 const deleteTransfer = async (req, res) => {
   try {
-    const transfer = await Transfer.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
+    const transfer = await Transfer.findOne({ _id: req.params.id, userId: req.user.id });
     if (!transfer) {
       return res.status(HttpStatus.NOT_FOUND).json({ message: 'Transfer not found' });
     }
+    const fromAccount = transfer.fromAccountId
+      ? await requireOwnedAccount(Account, req.user.id, transfer.fromAccountId)
+      : null;
+    const toAccount =
+      transfer.toAccountId && String(transfer.toAccountId) === String(transfer.fromAccountId)
+        ? fromAccount
+        : transfer.toAccountId
+          ? await requireOwnedAccount(Account, req.user.id, transfer.toAccountId)
+          : null;
+    await applyTransferPockets(
+      fromAccount,
+      transfer.fromSubBalanceId,
+      toAccount,
+      transfer.toSubBalanceId,
+      transfer.amount,
+      -1,
+    );
+    await transfer.deleteOne();
     res.status(HttpStatus.OK).json({ message: 'Transfer deleted' });
   } catch (error) {
     sendFinanceError(res, error);

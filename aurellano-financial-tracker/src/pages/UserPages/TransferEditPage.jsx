@@ -8,8 +8,9 @@ import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
+import SubBalanceSelect from '../../components/SubBalanceSelect';
 import { getAccountsRequest, getTransferRequest, updateTransferRequest } from '../../services/api';
-import { accountOption, selectableAccounts } from '../../utils/accounts';
+import { accountById, accountOption, pocketIdForAccount, pocketOptions, selectableAccounts } from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
@@ -36,6 +37,8 @@ const TransferEditPage = () => {
           toAccountId: transfer.toAccountId || 'other',
           recipientName: transfer.recipientName || '',
           amount: fromCentavos(transfer.amount),
+          fromSubBalanceId: transfer.fromSubBalanceId || '',
+          toSubBalanceId: transfer.toSubBalanceId || '',
           transactionDate: datetimeLocalInput(transfer.transactionDate),
         };
         setForm(nextForm);
@@ -58,11 +61,28 @@ const TransferEditPage = () => {
       recipientName: form.toAccountId === 'other' ? requiredText(form.recipientName, 'Recipient', 2) : '',
       amount: requiredAmount(form.amount),
       transactionDate: requiredChoice(form.transactionDate, 'Date'),
+      fromSubBalanceId:
+        form.fromAccountId !== 'other' && pocketOptions(accountById(accounts, form.fromAccountId)).length
+          ? requiredChoice(form.fromSubBalanceId, 'From sub-balance')
+          : '',
+      toSubBalanceId:
+        form.toAccountId !== 'other' && pocketOptions(accountById(accounts, form.toAccountId)).length
+          ? requiredChoice(form.toSubBalanceId, 'To sub-balance')
+          : '',
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
     if (form.fromAccountId === 'other' && form.toAccountId === 'other') {
       setError('One side must be one of your accounts');
+      return;
+    }
+    if (
+      form.fromAccountId !== 'other' &&
+      form.fromAccountId === form.toAccountId &&
+      form.fromSubBalanceId &&
+      form.fromSubBalanceId === form.toSubBalanceId
+    ) {
+      setError('Choose two different sub-balances');
       return;
     }
     setError('');
@@ -77,6 +97,8 @@ const TransferEditPage = () => {
             recipientName: form.toAccountId === 'other' ? form.recipientName.trim() : '',
             amount: toCentavos(form.amount),
             transactionDate: datetimeLocalToIso(form.transactionDate),
+            fromSubBalanceId: form.fromAccountId === 'other' ? null : form.fromSubBalanceId || null,
+            toSubBalanceId: form.toAccountId === 'other' ? null : form.toSubBalanceId || null,
           },
           token,
         );
@@ -106,9 +128,22 @@ const TransferEditPage = () => {
             ...accounts.map(accountOption),
             { value: 'other', label: 'From other' },
           ]}
-          onChange={(fromAccountId) => setForm({ ...form, fromAccountId })}
+          onChange={(fromAccountId) =>
+            setForm({
+              ...form,
+              fromAccountId,
+              fromSubBalanceId: fromAccountId === 'other' ? '' : pocketIdForAccount(accounts, fromAccountId),
+            })
+          }
         />
       </Field>
+      <SubBalanceSelect
+        account={form.fromAccountId === 'other' ? null : accountById(accounts, form.fromAccountId)}
+        value={form.fromSubBalanceId}
+        error={fieldErrors.fromSubBalanceId}
+        onChange={(fromSubBalanceId) => setForm({ ...form, fromSubBalanceId })}
+        label="From sub-balance"
+      />
       {form.fromAccountId === 'other' && (
         <Field label="Sender" error={fieldErrors.senderName}>
           <input
@@ -127,9 +162,22 @@ const TransferEditPage = () => {
             ...accounts.map(accountOption),
             { value: 'other', label: 'To other' },
           ]}
-          onChange={(toAccountId) => setForm({ ...form, toAccountId })}
+          onChange={(toAccountId) =>
+            setForm({
+              ...form,
+              toAccountId,
+              toSubBalanceId: toAccountId === 'other' ? '' : pocketIdForAccount(accounts, toAccountId),
+            })
+          }
         />
       </Field>
+      <SubBalanceSelect
+        account={form.toAccountId === 'other' ? null : accountById(accounts, form.toAccountId)}
+        value={form.toSubBalanceId}
+        error={fieldErrors.toSubBalanceId}
+        onChange={(toSubBalanceId) => setForm({ ...form, toSubBalanceId })}
+        label="To sub-balance"
+      />
       {form.toAccountId === 'other' && (
         <Field label="Recipient" error={fieldErrors.recipientName}>
           <input

@@ -9,7 +9,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import { createTransferRequest, getAccountsRequest } from '../../services/api';
+import SubBalanceSelect from '../../components/SubBalanceSelect';
 import { datetimeLocalToIso, nowDatetimeLocal, toCentavos } from '../../utils/format';
+import { accountById, pocketIdForAccount, pocketOptions } from '../../utils/accounts';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const draftKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -21,6 +23,8 @@ const blankRow = (seed = {}) => ({
   senderName: '',
   recipientName: '',
   amount: '',
+  fromSubBalanceId: '',
+  toSubBalanceId: '',
 });
 
 const TransferCreatePage = () => {
@@ -60,6 +64,8 @@ const TransferCreatePage = () => {
     recipientName: values.toAccountId === 'other' ? values.recipientName.trim() : '',
     amount: toCentavos(values.amount),
     transactionDate: datetimeLocalToIso(transactionDate),
+    fromSubBalanceId: values.fromSubBalanceId || undefined,
+    toSubBalanceId: values.toSubBalanceId || undefined,
   });
 
   const onSaveAll = async (event) => {
@@ -74,9 +80,25 @@ const TransferCreatePage = () => {
         senderName: row.fromAccountId === 'other' ? requiredText(row.senderName, 'Sender', 2) : '',
         recipientName: row.toAccountId === 'other' ? requiredText(row.recipientName, 'Recipient', 2) : '',
         amount: requiredAmount(row.amount),
+        fromSubBalanceId:
+          row.fromAccountId && row.fromAccountId !== 'other' && pocketOptions(accountById(activeAccounts, row.fromAccountId)).length
+            ? requiredChoice(row.fromSubBalanceId, 'From sub-balance')
+            : '',
+        toSubBalanceId:
+          row.toAccountId && row.toAccountId !== 'other' && pocketOptions(accountById(activeAccounts, row.toAccountId)).length
+            ? requiredChoice(row.toSubBalanceId, 'To sub-balance')
+            : '',
       };
       if (row.fromAccountId === 'other' && row.toAccountId === 'other') {
         formError = 'One side must be one of your accounts';
+      } else if (
+        row.fromAccountId &&
+        row.fromAccountId !== 'other' &&
+        row.fromAccountId === row.toAccountId &&
+        row.fromSubBalanceId &&
+        row.fromSubBalanceId === row.toSubBalanceId
+      ) {
+        formError = 'Choose two different sub-balances';
       }
     });
     setDateError(nextDateError);
@@ -139,9 +161,22 @@ const TransferCreatePage = () => {
                       ...activeAccounts.map((account) => ({ value: account._id, label: account.name })),
                       { value: 'other', label: 'From other' },
                     ]}
-                    onChange={(fromAccountId) => updateDraft(row.key, { fromAccountId })}
+                    onChange={(fromAccountId) =>
+                      updateDraft(row.key, {
+                        fromAccountId,
+                        fromSubBalanceId:
+                          fromAccountId === 'other' ? '' : pocketIdForAccount(activeAccounts, fromAccountId),
+                      })
+                    }
                   />
                 </Field>
+                <SubBalanceSelect
+                  account={row.fromAccountId === 'other' ? null : accountById(activeAccounts, row.fromAccountId)}
+                  value={row.fromSubBalanceId}
+                  error={errors.fromSubBalanceId}
+                  onChange={(fromSubBalanceId) => updateDraft(row.key, { fromSubBalanceId })}
+                  label="From sub-balance"
+                />
                 {row.fromAccountId === 'other' ? (
                   <Field label="Sender" error={errors.senderName}>
                     <input
@@ -160,9 +195,21 @@ const TransferCreatePage = () => {
                       ...activeAccounts.map((account) => ({ value: account._id, label: account.name })),
                       { value: 'other', label: 'To other' },
                     ]}
-                    onChange={(toAccountId) => updateDraft(row.key, { toAccountId })}
+                    onChange={(toAccountId) =>
+                      updateDraft(row.key, {
+                        toAccountId,
+                        toSubBalanceId: toAccountId === 'other' ? '' : pocketIdForAccount(activeAccounts, toAccountId),
+                      })
+                    }
                   />
                 </Field>
+                <SubBalanceSelect
+                  account={row.toAccountId === 'other' ? null : accountById(activeAccounts, row.toAccountId)}
+                  value={row.toSubBalanceId}
+                  error={errors.toSubBalanceId}
+                  onChange={(toSubBalanceId) => updateDraft(row.key, { toSubBalanceId })}
+                  label="To sub-balance"
+                />
                 {row.toAccountId === 'other' ? (
                   <Field label="Recipient" error={errors.recipientName}>
                     <input
@@ -216,10 +263,28 @@ const TransferCreatePage = () => {
                           ...activeAccounts.map((account) => ({ value: account._id, label: account.name })),
                           { value: 'other', label: 'From other' },
                         ]}
-                        onChange={(fromAccountId) => updateDraft(row.key, { fromAccountId })}
+                        onChange={(fromAccountId) =>
+                          updateDraft(row.key, {
+                            fromAccountId,
+                            fromSubBalanceId:
+                              fromAccountId === 'other' ? '' : pocketIdForAccount(activeAccounts, fromAccountId),
+                          })
+                        }
                       />
                       {errors.fromAccountId ? (
                         <p className="text-xs text-error-foreground">{errors.fromAccountId}</p>
+                      ) : null}
+                      {pocketOptions(accountById(activeAccounts, row.fromAccountId)).length && row.fromAccountId !== 'other' ? (
+                        <>
+                          <Select
+                            value={row.fromSubBalanceId}
+                            options={pocketOptions(accountById(activeAccounts, row.fromAccountId))}
+                            onChange={(fromSubBalanceId) => updateDraft(row.key, { fromSubBalanceId })}
+                          />
+                          {errors.fromSubBalanceId ? (
+                            <p className="text-xs text-error-foreground">{errors.fromSubBalanceId}</p>
+                          ) : null}
+                        </>
                       ) : null}
                       {row.fromAccountId === 'other' ? (
                         <>
@@ -244,9 +309,26 @@ const TransferCreatePage = () => {
                           ...activeAccounts.map((account) => ({ value: account._id, label: account.name })),
                           { value: 'other', label: 'To other' },
                         ]}
-                        onChange={(toAccountId) => updateDraft(row.key, { toAccountId })}
+                        onChange={(toAccountId) =>
+                          updateDraft(row.key, {
+                            toAccountId,
+                            toSubBalanceId: toAccountId === 'other' ? '' : pocketIdForAccount(activeAccounts, toAccountId),
+                          })
+                        }
                       />
                       {errors.toAccountId ? <p className="text-xs text-error-foreground">{errors.toAccountId}</p> : null}
+                      {pocketOptions(accountById(activeAccounts, row.toAccountId)).length && row.toAccountId !== 'other' ? (
+                        <>
+                          <Select
+                            value={row.toSubBalanceId}
+                            options={pocketOptions(accountById(activeAccounts, row.toAccountId))}
+                            onChange={(toSubBalanceId) => updateDraft(row.key, { toSubBalanceId })}
+                          />
+                          {errors.toSubBalanceId ? (
+                            <p className="text-xs text-error-foreground">{errors.toSubBalanceId}</p>
+                          ) : null}
+                        </>
+                      ) : null}
                       {row.toAccountId === 'other' ? (
                         <>
                           <input

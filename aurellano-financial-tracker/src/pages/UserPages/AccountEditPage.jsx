@@ -12,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
+import SubBalanceFields, { emptySubBalanceRow } from '../../components/SubBalanceFields';
 import { deleteAccountRequest, getAccountRequest, updateAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
 import { fromCentavos, toCentavos } from '../../utils/format';
@@ -38,9 +39,17 @@ const AccountEditPage = () => {
         const nextForm = {
           name: account.name,
           type: account.type,
-          currentAmount: fromCentavos(account.balance),
           remainingBalance: account.remainingBalance == null ? '' : fromCentavos(account.remainingBalance),
           description: account.description || '',
+          subBalances: (account.subBalances || []).length
+            ? account.subBalances.map((item) =>
+                emptySubBalanceRow({
+                  _id: item._id,
+                  label: item.label,
+                  amount: fromCentavos(item.amount),
+                }),
+              )
+            : [emptySubBalanceRow({ label: 'Current', amount: fromCentavos(account.balance) })],
         };
         setForm(nextForm);
         setBaseline(JSON.stringify(nextForm));
@@ -55,10 +64,21 @@ const AccountEditPage = () => {
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    const subBalances = form.subBalances
+      .filter((row) => String(row.label || '').trim())
+      .map((row) => ({
+        ...(row._id ? { _id: row._id } : {}),
+        label: row.label.trim(),
+        amount: toCentavos(row.amount || 0),
+      }));
     const nextErrors = {
       name: requiredText(form.name, 'Name', 2),
-      currentAmount: optionalAmount(form.currentAmount, 'Current amount'),
       remainingBalance: optionalAmount(form.remainingBalance, 'Remaining balance'),
+      subBalances: !subBalances.length
+        ? 'An account must have at least one sub-balance'
+        : form.subBalances.some((row) => row.amount && !String(row.label || '').trim())
+          ? 'Each sub-balance needs a label'
+          : '',
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
@@ -70,9 +90,9 @@ const AccountEditPage = () => {
           {
             name: form.name,
             type: form.type,
-            currentBalance: toCentavos(form.currentAmount || 0),
             remainingBalance: remainingCentavos(form.remainingBalance),
             description: form.description,
+            subBalances,
           },
           token,
         );
@@ -107,6 +127,11 @@ const AccountEditPage = () => {
     }
   };
 
+  const total = form
+    ? form.subBalances
+        .filter((row) => String(row.label || '').trim())
+        .reduce((sum, row) => sum + toCentavos(row.amount || 0), 0)
+    : 0;
   const dirty = Boolean(form) && JSON.stringify(form) !== baseline;
 
   return (
@@ -127,18 +152,23 @@ const AccountEditPage = () => {
           onChange={(type) => setForm({ ...form, type })}
         />
       </Field>
-      <Field label="Current amount (PHP)" error={fieldErrors.currentAmount}>
-        <input className={inputClass} type="number" min="0" step="0.01" value={form.currentAmount} onChange={(event) => setForm({ ...form, currentAmount: event.target.value })} />
+      <Field label="Current amount (PHP)">
+        <input className={inputClass} readOnly value={fromCentavos(total)} />
       </Field>
       <Field label="Remaining balance (PHP)" error={fieldErrors.remainingBalance}>
         <input className={inputClass} type="number" min="0" step="0.01" value={form.remainingBalance} onChange={(event) => setForm({ ...form, remainingBalance: event.target.value })} />
       </Field>
-      {belowRemainingBalance(toCentavos(form.currentAmount || 0), remainingCentavos(form.remainingBalance)) && (
+      {belowRemainingBalance(total, remainingCentavos(form.remainingBalance)) && (
         <BelowRemainingChip />
       )}
       <Field label="Description">
         <input className={inputClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
       </Field>
+      <SubBalanceFields
+        rows={form.subBalances}
+        error={fieldErrors.subBalances}
+        onChange={(subBalances) => setForm({ ...form, subBalances })}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit">Save changes</Button>
         <Button variant="danger" icon={Trash2} onClick={onDelete}>

@@ -1,7 +1,9 @@
 const Debt = require('../models/debtModel');
 const DebtPayment = require('../models/debtPaymentModel');
 const Account = require('../models/accountModel');
+const Transaction = require('../models/transactionModel');
 const { HttpStatus } = require('../config/constants');
+const { requireCategory } = require('./categoryController');
 const { isPaged, slicePage } = require('../utils/pagination');
 const {
   FinanceError,
@@ -37,6 +39,70 @@ const requireDebt = async (userId, debtId) => {
 };
 
 const refreshStatus = async (debt) => presentDebt(debt);
+
+const withIncome = async (userId, payments) => {
+  const ids = payments.map((payment) => payment.transactionId).filter(Boolean);
+  if (!ids.length) {
+    return payments.map((payment) => {
+      const plain = payment.toObject ? payment.toObject() : payment;
+      return { ...plain, income: null };
+    });
+  }
+  const transactions = await Transaction.find({ _id: { $in: ids }, userId });
+  const byId = new Map(transactions.map((item) => [String(item._id), item]));
+  return payments.map((payment) => {
+    const plain = payment.toObject ? payment.toObject() : payment;
+    return { ...plain, income: payment.transactionId ? byId.get(String(payment.transactionId)) || null : null };
+  });
+};
+
+const requireIncomeFields = (body) => {
+  const label = String(body.incomeLabel || '').trim();
+  const categoryId = body.incomeCategoryId;
+  if (!label || !categoryId) {
+    throw new FinanceError('Income label and category are required');
+  }
+  return { label, categoryId };
+};
+
+const createLinkedIncome = async (userId, payment, { label, categoryId }) => {
+  await requireCategory(userId, categoryId, 'INCOME');
+  return Transaction.create({
+    userId,
+    accountId: payment.accountId,
+    type: 'INCOME',
+    amount: payment.amount,
+    label,
+    categoryId,
+    description: payment.notes || '',
+    transactionDate: payment.paymentDate,
+  });
+};
+
+const syncLinkedIncome = async (userId, payment, extras = {}) => {
+  if (!payment.transactionId) return;
+  const transaction = await Transaction.findOne({ _id: payment.transactionId, userId });
+  if (!transaction) {
+    payment.transactionId = null;
+    return;
+  }
+  transaction.accountId = payment.accountId;
+  transaction.amount = payment.amount;
+  transaction.transactionDate = payment.paymentDate;
+  transaction.description = payment.notes || '';
+  if (extras.label) transaction.label = extras.label;
+  if (extras.categoryId) {
+    await requireCategory(userId, extras.categoryId, 'INCOME');
+    transaction.categoryId = extras.categoryId;
+  }
+  await transaction.save();
+};
+
+const deleteLinkedIncome = async (userId, payment) => {
+  if (!payment.transactionId) return;
+  await Transaction.deleteOne({ _id: payment.transactionId, userId });
+  payment.transactionId = null;
+};
 
 const emptyStatusCounts = () => ({
   PENDING: 0,
@@ -80,9 +146,12 @@ const getAllDebts = async (req, res) => {
 const getDebtById = async (req, res) => {
   try {
     const debt = await requireDebt(req.user.id, req.params.id);
-    const payments = await DebtPayment.find({ debtId: debt._id, userId: req.user.id }).sort({
-      paymentDate: -1,
-    });
+    const payments = await withIncome(
+      req.user.id,
+      await DebtPayment.find({ debtId: debt._id, userId: req.user.id }).sort({
+        paymentDate: -1,
+      }),
+    );
     const presented = await presentDebt(debt);
     if (req.query.additionsPage || req.query.paymentsPage) {
       res.status(HttpStatus.OK).json({
@@ -241,9 +310,21 @@ const createDebtPayment = async (req, res) => {
       paymentDate: new Date(req.body.paymentDate),
       notes: req.body.notes || '',
     });
+    if (req.body.recordAsIncome === true) {
+      try {
+        const fields = requireIncomeFields(req.body);
+        const income = await createLinkedIncome(req.user.id, payment, fields);
+        payment.transactionId = income._id;
+        await payment.save();
+      } catch (error) {
+        await payment.deleteOne();
+        throw error;
+      }
+    }
+    const [presented] = await withIncome(req.user.id, [payment]);
     res.status(HttpStatus.CREATED).json({
       message: 'Debt payment recorded',
-      payment,
+      payment: presented,
       debt: await refreshStatus(debt),
     });
   } catch (error) {
@@ -272,8 +353,22 @@ const updateDebtPayment = async (req, res) => {
     if (req.body.amount !== undefined) payment.amount = nextAmount;
     if (req.body.paymentDate !== undefined) payment.paymentDate = new Date(req.body.paymentDate);
     if (req.body.notes !== undefined) payment.notes = req.body.notes;
+    if (req.body.recordAsIncome === true) {
+      const fields = requireIncomeFields(req.body);
+      if (payment.transactionId) {
+        await syncLinkedIncome(req.user.id, payment, fields);
+      } else {
+        const income = await createLinkedIncome(req.user.id, payment, fields);
+        payment.transactionId = income._id;
+      }
+    } else if (req.body.recordAsIncome === false) {
+      await deleteLinkedIncome(req.user.id, payment);
+    } else {
+      await syncLinkedIncome(req.user.id, payment);
+    }
     await payment.save();
-    res.status(HttpStatus.OK).json({ payment, debt: await refreshStatus(debt) });
+    const [presented] = await withIncome(req.user.id, [payment]);
+    res.status(HttpStatus.OK).json({ payment: presented, debt: await refreshStatus(debt) });
   } catch (error) {
     sendFinanceError(res, error);
   }
@@ -281,13 +376,12 @@ const updateDebtPayment = async (req, res) => {
 
 const deleteDebtPayment = async (req, res) => {
   try {
-    const payment = await DebtPayment.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
+    const payment = await DebtPayment.findOne({ _id: req.params.id, userId: req.user.id });
     if (!payment) {
       return res.status(HttpStatus.NOT_FOUND).json({ message: 'Debt payment not found' });
     }
+    await deleteLinkedIncome(req.user.id, payment);
+    await payment.deleteOne();
     const debt = await requireDebt(req.user.id, payment.debtId);
     res.status(HttpStatus.OK).json({
       message: 'Debt payment deleted',

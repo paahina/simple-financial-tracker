@@ -8,10 +8,10 @@ import { ErrorText, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
-import { getAccountsRequest, getDebtRequest, updateDebtPaymentRequest } from '../../services/api';
+import { getAccountsRequest, getCategoriesRequest, getDebtRequest, updateDebtPaymentRequest } from '../../services/api';
 import { accountOption, selectableAccounts } from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
-import { hasErrors, requiredAmount, requiredChoice } from '../../utils/validate';
+import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const PaymentEditPage = () => {
   const { id, paymentId } = useParams();
@@ -21,13 +21,14 @@ const PaymentEditPage = () => {
   const [form, setForm] = useState(null);
   const [baseline, setBaseline] = useState('');
   const [accounts, setAccounts] = useState([]);
+  const [incomeCategories, setIncomeCategories] = useState([]);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     let active = true;
-    Promise.all([getDebtRequest(id, token), getAccountsRequest(token)])
-      .then(([detail, accountList]) => {
+    Promise.all([getDebtRequest(id, token), getAccountsRequest(token), getCategoriesRequest(token, { type: 'INCOME' })])
+      .then(([detail, accountList, categories]) => {
         if (!active) return;
         const payment = detail.payments.find((item) => item._id === paymentId);
         if (!payment) {
@@ -35,11 +36,15 @@ const PaymentEditPage = () => {
           return;
         }
         setAccounts(selectableAccounts(accountList, [payment.accountId]));
+        setIncomeCategories(categories);
         const nextForm = {
           accountId: payment.accountId,
           amount: fromCentavos(payment.amount),
           paymentDate: datetimeLocalInput(payment.paymentDate),
           notes: payment.notes || '',
+          recordAsIncome: Boolean(payment.transactionId),
+          incomeLabel: payment.income?.label || '',
+          incomeCategoryId: payment.income?.categoryId || '',
         };
         setForm(nextForm);
         setBaseline(JSON.stringify(nextForm));
@@ -58,6 +63,8 @@ const PaymentEditPage = () => {
       accountId: requiredChoice(form.accountId, 'Account'),
       amount: requiredAmount(form.amount),
       paymentDate: requiredChoice(form.paymentDate, 'Date'),
+      incomeLabel: form.recordAsIncome ? requiredText(form.incomeLabel, 'Income label') : '',
+      incomeCategoryId: form.recordAsIncome ? requiredChoice(form.incomeCategoryId, 'Income category') : '',
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
@@ -71,11 +78,14 @@ const PaymentEditPage = () => {
             amount: toCentavos(form.amount),
             paymentDate: datetimeLocalToIso(form.paymentDate),
             notes: form.notes,
+            recordAsIncome: form.recordAsIncome,
+            incomeLabel: form.recordAsIncome ? form.incomeLabel.trim() : undefined,
+            incomeCategoryId: form.recordAsIncome ? form.incomeCategoryId : undefined,
           },
           token,
         );
         navigate(`/debts/${id}?tab=payments`);
-        invalidateFamilies('debts', 'dashboard', 'accounts');
+        invalidateFamilies('debts', 'dashboard', 'accounts', 'transactions', 'reports');
         notify('Payment updated');
       });
     } catch (err) {
@@ -109,6 +119,32 @@ const PaymentEditPage = () => {
       <Field label="Notes">
         <input className={inputClass} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
       </Field>
+      <label className="flex items-center gap-2 text-sm text-neutral-900">
+        <input
+          type="checkbox"
+          checked={form.recordAsIncome}
+          onChange={(event) => setForm({ ...form, recordAsIncome: event.target.checked })}
+        />
+        Also record as income
+      </label>
+      {form.recordAsIncome ? (
+        <>
+          <Field label="Income label" error={fieldErrors.incomeLabel}>
+            <input
+              className={inputClass}
+              value={form.incomeLabel}
+              onChange={(event) => setForm({ ...form, incomeLabel: event.target.value })}
+            />
+          </Field>
+          <Field label="Income category" error={fieldErrors.incomeCategoryId}>
+            <Select
+              value={form.incomeCategoryId}
+              options={incomeCategories.map((category) => ({ value: category._id, label: category.name }))}
+              onChange={(incomeCategoryId) => setForm({ ...form, incomeCategoryId })}
+            />
+          </Field>
+        </>
+      ) : null}
       <Button type="submit">Save changes</Button>
     </form>
       )}

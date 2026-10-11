@@ -14,7 +14,9 @@ import {
   getAccountsRequest,
   getCategoriesRequest,
 } from '../../services/api';
+import SubBalanceSelect from '../../components/SubBalanceSelect';
 import { datetimeLocalToIso, nowDatetimeLocal, toCentavos } from '../../utils/format';
+import { accountById, pocketIdForAccount, pocketOptions } from '../../utils/accounts';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const draftKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -26,6 +28,7 @@ const blankRow = (seed = {}) => ({
   amount: '',
   label: '',
   categoryId: seed.categoryId || '',
+  subBalanceId: seed.subBalanceId || '',
 });
 
 const TransactionCreatePage = () => {
@@ -74,6 +77,9 @@ const TransactionCreatePage = () => {
         categoryId: requiredChoice(row.categoryId, 'Category'),
         label: requiredText(row.label, 'Label'),
         amount: requiredAmount(row.amount),
+        subBalanceId: pocketOptions(accountById(accounts, row.accountId)).length
+          ? requiredChoice(row.subBalanceId, 'Sub-balance')
+          : '',
       };
     });
     setDateError(nextDateError);
@@ -94,6 +100,7 @@ const TransactionCreatePage = () => {
               label: row.label,
               amount: toCentavos(row.amount),
               transactionDate: datetimeLocalToIso(transactionDate),
+              subBalanceId: row.subBalanceId || undefined,
             },
             token,
           );
@@ -141,9 +148,18 @@ const TransactionCreatePage = () => {
                   <Select
                     value={row.accountId}
                     options={accounts.map((account) => ({ value: account._id, label: account.name }))}
-                    onChange={(accountId) => updateDraft(row.key, { accountId })}
+                    onChange={(accountId) =>
+                      updateDraft(row.key, { accountId, subBalanceId: pocketIdForAccount(accounts, accountId) })
+                    }
                   />
                 </Field>
+                <SubBalanceSelect
+                  account={accountById(accounts, row.accountId)}
+                  value={row.subBalanceId}
+                  error={errors.subBalanceId}
+                  onChange={(subBalanceId) => updateDraft(row.key, { subBalanceId })}
+                  label={row.type === 'INCOME' ? 'Add to' : 'Deduct from'}
+                />
                 <Field label="Type">
                   <Select
                     value={row.type}
@@ -191,6 +207,7 @@ const TransactionCreatePage = () => {
             <thead>
               <tr className="bg-primary text-left text-neutral-0">
                 <th className="px-3 py-2 font-bold">Account</th>
+                <th className="px-3 py-2 font-bold">Sub-balance</th>
                 <th className="px-3 py-2 font-bold">Type</th>
                 <th className="px-3 py-2 font-bold">Category</th>
                 <th className="px-3 py-2 font-bold">Label</th>
@@ -208,9 +225,27 @@ const TransactionCreatePage = () => {
                       <Select
                         value={row.accountId}
                         options={accounts.map((account) => ({ value: account._id, label: account.name }))}
-                        onChange={(accountId) => updateDraft(row.key, { accountId })}
+                        onChange={(accountId) =>
+                          updateDraft(row.key, { accountId, subBalanceId: pocketIdForAccount(accounts, accountId) })
+                        }
                       />
                       {errors.accountId ? <p className="mt-1 text-xs text-error-foreground">{errors.accountId}</p> : null}
+                    </td>
+                    <td className="px-2 py-2">
+                      {pocketOptions(accountById(accounts, row.accountId)).length ? (
+                        <>
+                          <Select
+                            value={row.subBalanceId}
+                            options={pocketOptions(accountById(accounts, row.accountId))}
+                            onChange={(subBalanceId) => updateDraft(row.key, { subBalanceId })}
+                          />
+                          {errors.subBalanceId ? (
+                            <p className="mt-1 text-xs text-error-foreground">{errors.subBalanceId}</p>
+                          ) : null}
+                        </>
+                      ) : (
+                        <span className="text-neutral-500">—</span>
+                      )}
                     </td>
                     <td className="px-2 py-2">
                       <Select

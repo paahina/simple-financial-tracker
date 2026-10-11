@@ -25,6 +25,10 @@ const idFields = [
   'debtId',
   'fromAccountId',
   'toAccountId',
+  'transactionId',
+  'subBalanceId',
+  'fromSubBalanceId',
+  'toSubBalanceId',
 ];
 
 const normalizeMatch = (match) => {
@@ -59,6 +63,164 @@ const requireOwnedAccount = async (Account, userId, accountId, options = {}) => 
   return account;
 };
 
+const DEFAULT_CURRENT_LABEL = 'Current';
+
+const hasSubBalances = (account) => Boolean(account?.subBalances?.length);
+
+const subBalanceSum = (account) =>
+  (account?.subBalances || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+const findSubBalance = (account, subBalanceId) => {
+  if (!account || !subBalanceId) return null;
+  return account.subBalances.id(subBalanceId);
+};
+
+const requireSubBalance = (account, subBalanceId) => {
+  if (!hasSubBalances(account)) {
+    if (subBalanceId) {
+      throw new FinanceError('This account has no sub-balances');
+    }
+    return null;
+  }
+  if (!subBalanceId) {
+    throw new FinanceError('Sub-balance is required');
+  }
+  const slice = findSubBalance(account, subBalanceId);
+  if (!slice) {
+    throw new FinanceError('Sub-balance not found');
+  }
+  return slice;
+};
+
+const applySubBalanceDelta = (account, subBalanceId, delta) => {
+  if (!delta || !subBalanceId) return;
+  const slice = requireSubBalance(account, subBalanceId);
+  if (!slice) return;
+  const next = Number(slice.amount) + Number(delta);
+  if (next < 0) {
+    throw new FinanceError('Sub-balance cannot go below zero');
+  }
+  slice.amount = next;
+};
+
+const normalizeSubBalances = (items) => {
+  if (items == null) return null;
+  if (!Array.isArray(items)) {
+    throw new FinanceError('Sub-balances must be a list');
+  }
+  return items.map((item) => {
+    const label = String(item.label || '').trim();
+    const amount = Number(item.amount || 0);
+    if (!label) {
+      throw new FinanceError('Sub-balance label is required');
+    }
+    if (label.length > 100) {
+      throw new FinanceError('Sub-balance label is too long');
+    }
+    if (!Number.isInteger(amount) || amount < 0) {
+      throw new FinanceError('Sub-balance amount cannot be negative');
+    }
+    const next = { label, amount };
+    if (item._id && mongoose.isValidObjectId(item._id)) next._id = item._id;
+    return next;
+  });
+};
+
+const requireAtLeastOneSubBalance = (items) => {
+  const next = normalizeSubBalances(items) || [];
+  if (!next.length) {
+    throw new FinanceError('An account must have at least one sub-balance');
+  }
+  return next;
+};
+
+const findCurrentPocket = (account) =>
+  (account.subBalances || []).find(
+    (item) => String(item.label || '').trim().toLowerCase() === DEFAULT_CURRENT_LABEL.toLowerCase(),
+  ) || account.subBalances?.[0];
+
+const ensureAccountPockets = (account, balance) => {
+  const target = Math.max(0, Number(balance) || 0);
+  if (!account.subBalances) account.subBalances = [];
+  if (!account.subBalances.length) {
+    account.subBalances.push({ label: DEFAULT_CURRENT_LABEL, amount: target });
+    return true;
+  }
+  const sum = subBalanceSum(account);
+  if (sum >= target) return false;
+  const remainder = target - sum;
+  const current = findCurrentPocket(account);
+  if (current) {
+    current.amount = Number(current.amount) + remainder;
+  } else {
+    account.subBalances.unshift({ label: DEFAULT_CURRENT_LABEL, amount: remainder });
+  }
+  return true;
+};
+
+const syncPocketsToBalance = (account, desired) => {
+  const target = Number(desired);
+  ensureAccountPockets(account, target);
+  const delta = target - subBalanceSum(account);
+  if (!delta) return;
+  const current = findCurrentPocket(account);
+  applySubBalanceDelta(account, current._id, delta);
+};
+
+const resolvePocketId = (account, requestedId) => {
+  if (!account) return null;
+  if (requestedId) {
+    requireSubBalance(account, requestedId);
+    return requestedId;
+  }
+  if (account.subBalances?.length === 1) {
+    return account.subBalances[0]._id;
+  }
+  if (hasSubBalances(account)) {
+    throw new FinanceError('Sub-balance is required');
+  }
+  return null;
+};
+
+const assertSubBalancesMatch = (account, balance) => {
+  if (subBalanceSum(account) !== Number(balance)) {
+    throw new FinanceError('Sub-balances must add up to the account total');
+  }
+};
+
+const pocketDeltaForType = (type, amount) => (type === 'EXPENSE' ? -Number(amount) : Number(amount));
+
+const applyTransferPockets = async (fromAccount, fromSubId, toAccount, toSubId, amount, direction = 1) => {
+  const delta = Number(amount) * direction;
+  const same =
+    fromAccount && toAccount && String(fromAccount._id) === String(toAccount._id);
+  if (same) {
+    applySubBalanceDelta(fromAccount, fromSubId, -delta);
+    applySubBalanceDelta(fromAccount, toSubId, delta);
+    await fromAccount.save();
+    return;
+  }
+  if (fromAccount) {
+    applySubBalanceDelta(fromAccount, fromSubId, -delta);
+    await fromAccount.save();
+  }
+  if (toAccount) {
+    applySubBalanceDelta(toAccount, toSubId, delta);
+    await toAccount.save();
+  }
+};
+
+const assertTransferTargets = (fromAccount, fromSubId, toAccount, toSubId) => {
+  if (fromAccount && toAccount && String(fromAccount._id) === String(toAccount._id)) {
+    if (!hasSubBalances(fromAccount)) {
+      throw new FinanceError('Source and destination accounts must be different');
+    }
+    if (!fromSubId || !toSubId || String(fromSubId) === String(toSubId)) {
+      throw new FinanceError('Choose two different sub-balances');
+    }
+  }
+};
+
 const balanceForAccount = async (account, models) => {
   const accountId = account._id;
   const userId = account.userId;
@@ -68,7 +230,11 @@ const balanceForAccount = async (account, models) => {
       sumAmount(models.Transaction, { userId, accountId, type: 'EXPENSE' }),
       sumAmount(models.Transfer, { userId, toAccountId: accountId }),
       sumAmount(models.Transfer, { userId, fromAccountId: accountId }),
-      sumAmount(models.DebtPayment, { userId, accountId }),
+      sumAmount(models.DebtPayment, {
+        userId,
+        accountId,
+        $or: [{ transactionId: { $exists: false } }, { transactionId: null }],
+      }),
     ]);
 
   return (
@@ -128,6 +294,20 @@ module.exports = {
   monthRange,
   sumAmount,
   requireOwnedAccount,
+  hasSubBalances,
+  subBalanceSum,
+  requireSubBalance,
+  applySubBalanceDelta,
+  normalizeSubBalances,
+  requireAtLeastOneSubBalance,
+  DEFAULT_CURRENT_LABEL,
+  ensureAccountPockets,
+  syncPocketsToBalance,
+  resolvePocketId,
+  assertSubBalancesMatch,
+  pocketDeltaForType,
+  applyTransferPockets,
+  assertTransferTargets,
   balanceForAccount,
   debtTotals,
   debtState,

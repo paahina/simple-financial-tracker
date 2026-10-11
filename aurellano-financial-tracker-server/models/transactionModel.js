@@ -4,6 +4,7 @@ const transactionSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true },
+    subBalanceId: { type: mongoose.Schema.Types.ObjectId, default: null },
     type: { type: String, required: true, enum: ['INCOME', 'EXPENSE'] },
     amount: { type: Number, required: true, min: 1 },
     label: { type: String, required: true, trim: true, maxlength: 100 },

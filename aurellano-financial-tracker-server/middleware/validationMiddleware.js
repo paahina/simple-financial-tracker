@@ -62,6 +62,9 @@ const accountValidation = [
   body('remainingBalance').optional({ nullable: true }).isInt({ min: 0 }),
   body('currency').optional().isString().trim().isLength({ min: 3, max: 3 }),
   body('description').optional().isString().trim(),
+  body('subBalances').optional().isArray(),
+  body('subBalances.*.label').optional().isString().trim().isLength({ min: 1, max: 100 }),
+  body('subBalances.*.amount').optional().isInt({ min: 0 }),
   handleValidation,
 ];
 
@@ -72,6 +75,9 @@ const accountUpdateValidation = [
   body('description').optional().isString().trim(),
   body('currentBalance').optional().isInt({ min: 0 }),
   body('remainingBalance').optional({ nullable: true }).isInt({ min: 0 }),
+  body('subBalances').optional().isArray(),
+  body('subBalances.*.label').optional().isString().trim().isLength({ min: 1, max: 100 }),
+  body('subBalances.*.amount').optional().isInt({ min: 0 }),
   handleValidation,
 ];
 
@@ -95,6 +101,7 @@ const transactionValidation = [
   body('categoryId').isMongoId(),
   body('description').optional().isString().trim(),
   body('transactionDate').isISO8601().withMessage('Transaction date is required'),
+  body('subBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
   handleValidation,
 ];
 
@@ -106,6 +113,7 @@ const transactionUpdateValidation = [
   body('categoryId').optional().isMongoId(),
   body('description').optional().isString().trim(),
   body('transactionDate').optional().isISO8601(),
+  body('subBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
   handleValidation,
 ];
 
@@ -125,6 +133,8 @@ const transferValidation = [
   body('amount').isInt({ min: 1 }).withMessage('Amount must be a positive integer in centavos'),
   body('description').optional().isString().trim(),
   body('transactionDate').isISO8601(),
+  body('fromSubBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
+  body('toSubBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
   handleValidation,
 ];
 
@@ -136,6 +146,8 @@ const transferUpdateValidation = [
   body('amount').optional().isInt({ min: 1 }),
   body('description').optional().isString().trim(),
   body('transactionDate').optional().isISO8601(),
+  body('fromSubBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
+  body('toSubBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
   handleValidation,
 ];
 
@@ -176,6 +188,9 @@ const debtPaymentValidation = [
   body('amount').isInt({ min: 1 }),
   body('paymentDate').isISO8601(),
   body('notes').optional().isString().trim(),
+  body('recordAsIncome').optional().isBoolean(),
+  body('incomeLabel').optional().isString().trim().isLength({ min: 1, max: 100 }),
+  body('incomeCategoryId').optional().isMongoId(),
   handleValidation,
 ];
 
@@ -184,6 +199,9 @@ const debtPaymentUpdateValidation = [
   body('amount').optional().isInt({ min: 1 }),
   body('paymentDate').optional().isISO8601(),
   body('notes').optional().isString().trim(),
+  body('recordAsIncome').optional().isBoolean(),
+  body('incomeLabel').optional().isString().trim().isLength({ min: 1, max: 100 }),
+  body('incomeCategoryId').optional().isMongoId(),
   handleValidation,
 ];
 

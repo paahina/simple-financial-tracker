@@ -70,6 +70,9 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   });
   assert.equal(cash.status, 201);
   assert.equal(gcash.status, 201);
+  assert.equal(cash.body.account.subBalances.length, 1);
+  assert.equal(cash.body.account.subBalances[0].label, 'Current');
+  assert.equal(cash.body.account.subBalances[0].amount, 500000);
 
   const income = await request(app).post('/api/transactions/create').set(auth(token)).send({
     accountId: cash.body.account._id,
@@ -314,4 +317,116 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
     .get(`/api/accounts/get/${cash.body.account._id}`)
     .set(auth(other));
   assert.equal(hidden.status, 404);
+});
+
+test('debt payment can also create a linked income transaction without doubling balance', async () => {
+  const token = await register('income-payment@example.com');
+  const today = new Date().toISOString();
+  const categories = await request(app).get('/api/categories/getAllCategories').set(auth(token));
+  const otherIncome = categories.body.find((item) => item.name === 'Other' && item.type === 'INCOME');
+  const cash = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Cash',
+    type: 'CASH',
+    initialBalance: 0,
+  });
+  const debt = await request(app).post('/api/debts/create').set(auth(token)).send({
+    personName: 'Ana',
+    originalAmount: 10000,
+  });
+  const linked = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: debt.body.debt._id,
+    accountId: cash.body.account._id,
+    amount: 4000,
+    paymentDate: today,
+    recordAsIncome: true,
+    incomeLabel: 'Ana paid',
+    incomeCategoryId: otherIncome._id,
+  });
+  assert.equal(linked.status, 201);
+  assert.ok(linked.body.payment.transactionId);
+  assert.equal(linked.body.debt.remainingAmount, 6000);
+
+  const accounts = await request(app).get('/api/accounts/getAllAccounts').set(auth(token));
+  assert.equal(accounts.body[0].balance, 4000);
+
+  const now = new Date();
+  const report = await request(app)
+    .get(`/api/reports/monthly?year=${now.getUTCFullYear()}&month=${now.getUTCMonth() + 1}`)
+    .set(auth(token));
+  assert.equal(report.body.income, 4000);
+
+  const removed = await request(app)
+    .delete(`/api/debts/deletePayment/${linked.body.payment._id}`)
+    .set(auth(token));
+  assert.equal(removed.status, 200);
+  const after = await request(app).get('/api/accounts/getAllAccounts').set(auth(token));
+  assert.equal(after.body[0].balance, 0);
+  const txs = await request(app).get('/api/transactions/getAllTransactions?page=1&limit=10').set(auth(token));
+  assert.equal(txs.body.total, 0);
+});
+
+test('account sub-balances move with transactions and same-account transfers', async () => {
+  const token = await register('pockets@example.com');
+  const today = new Date().toISOString();
+  const categories = await request(app).get('/api/categories/getAllCategories').set(auth(token));
+  const food = categories.body.find((item) => item.name === 'Food' && item.type === 'EXPENSE');
+  const created = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'BPI',
+    type: 'BANK',
+    initialBalance: 350000,
+    subBalances: [
+      { label: 'Savings', amount: 20000 },
+      { label: 'Spend', amount: 330000 },
+    ],
+  });
+  assert.equal(created.status, 201);
+  const savings = created.body.account.subBalances.find((item) => item.label === 'Savings');
+  const spend = created.body.account.subBalances.find((item) => item.label === 'Spend');
+  const missingPocket = await request(app).post('/api/transactions/create').set(auth(token)).send({
+    accountId: created.body.account._id,
+    type: 'EXPENSE',
+    amount: 1000,
+    label: 'Snack',
+    categoryId: food._id,
+    transactionDate: today,
+  });
+  assert.equal(missingPocket.status, 400);
+
+  const expense = await request(app).post('/api/transactions/create').set(auth(token)).send({
+    accountId: created.body.account._id,
+    type: 'EXPENSE',
+    amount: 5000,
+    label: 'Snack',
+    categoryId: food._id,
+    subBalanceId: spend._id,
+    transactionDate: today,
+  });
+  assert.equal(expense.status, 201);
+
+  const tooMuch = await request(app).post('/api/transfers/create').set(auth(token)).send({
+    fromAccountId: created.body.account._id,
+    toAccountId: created.body.account._id,
+    fromSubBalanceId: savings._id,
+    toSubBalanceId: spend._id,
+    amount: 20001,
+    transactionDate: today,
+  });
+  assert.equal(tooMuch.status, 400);
+
+  const moved = await request(app).post('/api/transfers/create').set(auth(token)).send({
+    fromAccountId: created.body.account._id,
+    toAccountId: created.body.account._id,
+    fromSubBalanceId: savings._id,
+    toSubBalanceId: spend._id,
+    amount: 10000,
+    transactionDate: today,
+  });
+  assert.equal(moved.status, 201);
+
+  const account = await request(app).get(`/api/accounts/get/${created.body.account._id}`).set(auth(token));
+  assert.equal(account.body.balance, 345000);
+  const nextSavings = account.body.subBalances.find((item) => item.label === 'Savings');
+  const nextSpend = account.body.subBalances.find((item) => item.label === 'Spend');
+  assert.equal(nextSavings.amount, 10000);
+  assert.equal(nextSpend.amount, 335000);
 });

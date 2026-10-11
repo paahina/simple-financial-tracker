@@ -6,14 +6,24 @@ const { HttpStatus } = require('../config/constants');
 const { isPaged, parsePagination, paginatedResponse } = require('../utils/pagination');
 const {
   FinanceError,
+  DEFAULT_CURRENT_LABEL,
+  assertSubBalancesMatch,
   balanceForAccount,
+  ensureAccountPockets,
+  requireAtLeastOneSubBalance,
   requireOwnedAccount,
   sendFinanceError,
+  subBalanceSum,
+  syncPocketsToBalance,
 } = require('../utils/finance');
 
 const models = { Transaction, Transfer, DebtPayment };
 
 const withBalance = async (account) => {
+  const balance = await balanceForAccount(account, models);
+  if (ensureAccountPockets(account, balance)) {
+    await account.save();
+  }
   const plain = account.toObject();
   plain.balance = await balanceForAccount(account, models);
   return plain;
@@ -58,16 +68,33 @@ const getAccountById = async (req, res) => {
   }
 };
 
+const unusedSubBalances = async (userId, removedIds) => {
+  if (!removedIds.length) return;
+  const [transactions, fromTransfers, toTransfers] = await Promise.all([
+    Transaction.countDocuments({ userId, subBalanceId: { $in: removedIds } }),
+    Transfer.countDocuments({ userId, fromSubBalanceId: { $in: removedIds } }),
+    Transfer.countDocuments({ userId, toSubBalanceId: { $in: removedIds } }),
+  ]);
+  if (transactions || fromTransfers || toTransfers) {
+    throw new FinanceError('A sub-balance is used by existing activity and cannot be removed');
+  }
+};
+
 const createAccount = async (req, res) => {
   try {
+    const subBalances = req.body.subBalances?.length
+      ? requireAtLeastOneSubBalance(req.body.subBalances)
+      : [{ label: DEFAULT_CURRENT_LABEL, amount: Number(req.body.initialBalance || 0) }];
+    const initialBalance = subBalanceSum({ subBalances });
     const account = await Account.create({
       userId: req.user.id,
       name: req.body.name,
       type: req.body.type,
-      initialBalance: Number(req.body.initialBalance || 0),
+      initialBalance,
       currency: req.body.currency || 'PHP',
       description: req.body.description || '',
       remainingBalance: req.body.remainingBalance == null ? null : Number(req.body.remainingBalance),
+      subBalances,
       isActive: true,
     });
     res.status(HttpStatus.CREATED).json({
@@ -90,13 +117,26 @@ const updateAccount = async (req, res) => {
     if (remainingBalance !== undefined) {
       account.remainingBalance = remainingBalance == null ? null : Number(remainingBalance);
     }
-    if (currentBalance !== undefined) {
+    if (req.body.subBalances !== undefined) {
+      const previousIds = (account.subBalances || []).map((item) => String(item._id));
+      const next = requireAtLeastOneSubBalance(req.body.subBalances);
+      const nextIds = new Set(next.filter((item) => item._id).map((item) => String(item._id)));
+      const removed = previousIds.filter((id) => !nextIds.has(id));
+      await unusedSubBalances(req.user.id, removed);
+      account.subBalances = next;
+      const desired = subBalanceSum(account);
+      const current = await balanceForAccount(account, models);
+      account.initialBalance = account.initialBalance + (desired - current);
+    } else if (currentBalance !== undefined) {
       const desired = Number(currentBalance);
       const current = await balanceForAccount(account, models);
       account.initialBalance = account.initialBalance + (desired - current);
+      syncPocketsToBalance(account, desired);
     }
     await account.save();
-    res.status(HttpStatus.OK).json(await withBalance(account));
+    const presented = await withBalance(account);
+    assertSubBalancesMatch(account, presented.balance);
+    res.status(HttpStatus.OK).json(presented);
   } catch (error) {
     sendFinanceError(res, error);
   }

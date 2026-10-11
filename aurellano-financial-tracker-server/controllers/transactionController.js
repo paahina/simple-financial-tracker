@@ -1,9 +1,17 @@
 const { Types } = require('mongoose');
 const Transaction = require('../models/transactionModel');
 const Account = require('../models/accountModel');
+const DebtPayment = require('../models/debtPaymentModel');
 const { HttpStatus } = require('../config/constants');
 const { requireCategory } = require('./categoryController');
-const { requireOwnedAccount, sendFinanceError } = require('../utils/finance');
+const {
+  FinanceError,
+  applySubBalanceDelta,
+  pocketDeltaForType,
+  requireOwnedAccount,
+  resolvePocketId,
+  sendFinanceError,
+} = require('../utils/finance');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
 const { listActivityDays } = require('../utils/dayGroups');
 
@@ -65,15 +73,31 @@ const getTransactionById = async (req, res) => {
   }
 };
 
+const linkedPaymentMessage = 'Edit or delete this income from the debt payment';
+
+const assertNotLinkedPayment = async (userId, transactionId) => {
+  const linked = await DebtPayment.findOne({ userId, transactionId });
+  if (linked) {
+    throw new FinanceError(linkedPaymentMessage);
+  }
+};
+
+const pocketIdFor = (account, requestedId) => resolvePocketId(account, requestedId || null);
+
 const createTransaction = async (req, res) => {
   try {
-    await requireOwnedAccount(Account, req.user.id, req.body.accountId, { active: true });
+    const account = await requireOwnedAccount(Account, req.user.id, req.body.accountId, { active: true });
     await requireCategory(req.user.id, req.body.categoryId, req.body.type);
+    const amount = Number(req.body.amount);
+    const subBalanceId = pocketIdFor(account, req.body.subBalanceId || null);
+    applySubBalanceDelta(account, subBalanceId, pocketDeltaForType(req.body.type, amount));
+    await account.save();
     const transaction = await Transaction.create({
       userId: req.user.id,
       accountId: req.body.accountId,
+      subBalanceId,
       type: req.body.type,
-      amount: Number(req.body.amount),
+      amount,
       label: req.body.label,
       categoryId: req.body.categoryId,
       description: req.body.description || '',
@@ -88,22 +112,42 @@ const createTransaction = async (req, res) => {
 const updateTransaction = async (req, res) => {
   try {
     const transaction = await requireTransaction(req.user.id, req.params.id);
+    await assertNotLinkedPayment(req.user.id, transaction._id);
     const nextType = req.body.type || transaction.type;
     const nextAccountId = req.body.accountId || transaction.accountId;
     const nextCategoryId = req.body.categoryId || transaction.categoryId;
-    await requireOwnedAccount(Account, req.user.id, nextAccountId, {
+    const nextAmount = req.body.amount !== undefined ? Number(req.body.amount) : transaction.amount;
+    const oldAccount = await requireOwnedAccount(Account, req.user.id, transaction.accountId);
+    const nextAccount = await requireOwnedAccount(Account, req.user.id, nextAccountId, {
       active: String(nextAccountId) !== String(transaction.accountId),
     });
     await requireCategory(req.user.id, nextCategoryId, nextType);
+    const requestedSub =
+      req.body.subBalanceId !== undefined ? req.body.subBalanceId || null : transaction.subBalanceId;
+    const nextSubBalanceId = pocketIdFor(nextAccount, requestedSub);
+    applySubBalanceDelta(
+      oldAccount,
+      transaction.subBalanceId,
+      -pocketDeltaForType(transaction.type, transaction.amount),
+    );
+    if (String(oldAccount._id) === String(nextAccount._id)) {
+      applySubBalanceDelta(oldAccount, nextSubBalanceId, pocketDeltaForType(nextType, nextAmount));
+      await oldAccount.save();
+    } else {
+      await oldAccount.save();
+      applySubBalanceDelta(nextAccount, nextSubBalanceId, pocketDeltaForType(nextType, nextAmount));
+      await nextAccount.save();
+    }
     if (req.body.accountId !== undefined) transaction.accountId = req.body.accountId;
     if (req.body.type !== undefined) transaction.type = req.body.type;
-    if (req.body.amount !== undefined) transaction.amount = Number(req.body.amount);
+    if (req.body.amount !== undefined) transaction.amount = nextAmount;
     if (req.body.label !== undefined) transaction.label = req.body.label;
     if (req.body.categoryId !== undefined) transaction.categoryId = req.body.categoryId;
     if (req.body.description !== undefined) transaction.description = req.body.description;
     if (req.body.transactionDate !== undefined) {
       transaction.transactionDate = new Date(req.body.transactionDate);
     }
+    transaction.subBalanceId = nextSubBalanceId;
     await transaction.save();
     res.status(HttpStatus.OK).json(transaction);
   } catch (error) {
@@ -113,13 +157,19 @@ const updateTransaction = async (req, res) => {
 
 const deleteTransaction = async (req, res) => {
   try {
-    const transaction = await Transaction.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
+    const transaction = await Transaction.findOne({ _id: req.params.id, userId: req.user.id });
     if (!transaction) {
       return res.status(HttpStatus.NOT_FOUND).json({ message: 'Transaction not found' });
     }
+    await assertNotLinkedPayment(req.user.id, transaction._id);
+    const account = await requireOwnedAccount(Account, req.user.id, transaction.accountId);
+    applySubBalanceDelta(
+      account,
+      transaction.subBalanceId,
+      -pocketDeltaForType(transaction.type, transaction.amount),
+    );
+    await account.save();
+    await transaction.deleteOne();
     res.status(HttpStatus.OK).json({ message: 'Transaction deleted' });
   } catch (error) {
     sendFinanceError(res, error);
