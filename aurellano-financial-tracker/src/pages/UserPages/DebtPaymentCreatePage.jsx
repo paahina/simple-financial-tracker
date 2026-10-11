@@ -10,6 +10,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { createDebtPaymentRequest, getAccountsRequest, getCategoriesRequest } from '../../services/api';
+import SubBalanceSelect from '../../components/SubBalanceSelect';
+import { accountById, pocketIdForAccount, pocketOptions } from '../../utils/accounts';
 import { datetimeLocalToIso, nowDatetimeLocal, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
@@ -20,6 +22,7 @@ const DebtPaymentCreatePage = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     accountId: '',
+    subBalanceId: '',
     amount: '',
     paymentDate: nowDatetimeLocal(),
     recordAsIncome: false,
@@ -49,6 +52,9 @@ const DebtPaymentCreatePage = () => {
     event.preventDefault();
     const nextErrors = {
       accountId: requiredChoice(form.accountId, 'Account'),
+      subBalanceId: pocketOptions(accountById(accounts, form.accountId)).length
+        ? requiredChoice(form.subBalanceId, 'Sub-balance')
+        : '',
       amount: requiredAmount(form.amount),
       paymentDate: requiredChoice(form.paymentDate, 'Date'),
       incomeLabel: form.recordAsIncome ? requiredText(form.incomeLabel, 'Income label') : '',
@@ -63,6 +69,7 @@ const DebtPaymentCreatePage = () => {
           {
             debtId: id,
             accountId: form.accountId,
+            subBalanceId: form.subBalanceId || null,
             amount: toCentavos(form.amount),
             paymentDate: datetimeLocalToIso(form.paymentDate),
             recordAsIncome: form.recordAsIncome,
@@ -94,9 +101,18 @@ const DebtPaymentCreatePage = () => {
             <Select
               value={form.accountId}
               options={accounts.map((account) => ({ value: account._id, label: account.name }))}
-              onChange={(accountId) => setForm({ ...form, accountId })}
+              onChange={(accountId) =>
+                setForm({ ...form, accountId, subBalanceId: pocketIdForAccount(accounts, accountId) })
+              }
             />
           </Field>
+          <SubBalanceSelect
+            account={accountById(accounts, form.accountId)}
+            value={form.subBalanceId}
+            error={fieldErrors.subBalanceId}
+            onChange={(subBalanceId) => setForm({ ...form, subBalanceId })}
+            label="Add to"
+          />
           <Field label="Amount (PHP)" error={fieldErrors.amount}>
             <input
               className={inputClass}

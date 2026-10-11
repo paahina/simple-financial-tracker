@@ -7,10 +7,12 @@ const { requireCategory } = require('./categoryController');
 const { isPaged, slicePage } = require('../utils/pagination');
 const {
   FinanceError,
+  applySubBalanceDelta,
   debtState,
   debtTotals,
   owedAmount,
   requireOwnedAccount,
+  resolvePocketId,
   sendFinanceError,
 } = require('../utils/finance');
 
@@ -70,6 +72,7 @@ const createLinkedIncome = async (userId, payment, { label, categoryId }) => {
   return Transaction.create({
     userId,
     accountId: payment.accountId,
+    subBalanceId: payment.subBalanceId,
     type: 'INCOME',
     amount: payment.amount,
     label,
@@ -87,6 +90,7 @@ const syncLinkedIncome = async (userId, payment, extras = {}) => {
     return;
   }
   transaction.accountId = payment.accountId;
+  transaction.subBalanceId = payment.subBalanceId;
   transaction.amount = payment.amount;
   transaction.transactionDate = payment.paymentDate;
   transaction.description = payment.notes || '';
@@ -292,20 +296,28 @@ const getDebtPayments = async (req, res) => {
   }
 };
 
+const applyPaymentPocket = async (account, subBalanceId, amount) => {
+  applySubBalanceDelta(account, subBalanceId, amount);
+  await account.save();
+};
+
 const createDebtPayment = async (req, res) => {
   try {
     const debt = await requireDebt(req.user.id, req.body.debtId);
-    await requireOwnedAccount(Account, req.user.id, req.body.accountId, { active: true });
+    const account = await requireOwnedAccount(Account, req.user.id, req.body.accountId, { active: true });
     const paid = await debtTotals(DebtPayment, debt._id);
     const remaining = owedAmount(debt) - paid;
     const amount = Number(req.body.amount);
     if (amount > remaining) {
       throw new FinanceError('Payment cannot be greater than the remaining debt');
     }
+    const subBalanceId = resolvePocketId(account, req.body.subBalanceId || null);
+    await applyPaymentPocket(account, subBalanceId, amount);
     const payment = await DebtPayment.create({
       userId: req.user.id,
       debtId: debt._id,
       accountId: req.body.accountId,
+      subBalanceId,
       amount,
       paymentDate: new Date(req.body.paymentDate),
       notes: req.body.notes || '',
@@ -317,6 +329,7 @@ const createDebtPayment = async (req, res) => {
         payment.transactionId = income._id;
         await payment.save();
       } catch (error) {
+        await applyPaymentPocket(account, subBalanceId, -amount);
         await payment.deleteOne();
         throw error;
       }
@@ -340,19 +353,31 @@ const updateDebtPayment = async (req, res) => {
     }
     const debt = await requireDebt(req.user.id, payment.debtId);
     const nextAccountId = req.body.accountId || payment.accountId;
-    await requireOwnedAccount(Account, req.user.id, nextAccountId, {
-      active: String(nextAccountId) !== String(payment.accountId),
-    });
+    const sameAccount = String(nextAccountId) === String(payment.accountId);
+    const oldAccount = await requireOwnedAccount(Account, req.user.id, payment.accountId);
+    const nextAccount = sameAccount
+      ? oldAccount
+      : await requireOwnedAccount(Account, req.user.id, nextAccountId, { active: true });
     const paid = await debtTotals(DebtPayment, debt._id);
-    const nextAmount = req.body.amount !== undefined ? Number(req.body.amount) : payment.amount;
-    const remainingWithoutThis = owedAmount(debt) - (paid - payment.amount);
+    const oldAmount = Number(payment.amount);
+    const nextAmount = req.body.amount !== undefined ? Number(req.body.amount) : oldAmount;
+    const remainingWithoutThis = owedAmount(debt) - (paid - oldAmount);
     if (nextAmount > remainingWithoutThis) {
       throw new FinanceError('Payment cannot be greater than the remaining debt');
     }
+    const requestedPocket =
+      req.body.subBalanceId !== undefined
+        ? req.body.subBalanceId || null
+        : sameAccount
+          ? payment.subBalanceId
+          : null;
+    const oldPocketId = resolvePocketId(oldAccount, payment.subBalanceId);
+    const nextPocketId = resolvePocketId(nextAccount, requestedPocket);
     if (req.body.accountId !== undefined) payment.accountId = req.body.accountId;
     if (req.body.amount !== undefined) payment.amount = nextAmount;
     if (req.body.paymentDate !== undefined) payment.paymentDate = new Date(req.body.paymentDate);
     if (req.body.notes !== undefined) payment.notes = req.body.notes;
+    payment.subBalanceId = nextPocketId;
     if (req.body.recordAsIncome === true) {
       const fields = requireIncomeFields(req.body);
       if (payment.transactionId) {
@@ -367,6 +392,10 @@ const updateDebtPayment = async (req, res) => {
       await syncLinkedIncome(req.user.id, payment);
     }
     await payment.save();
+    applySubBalanceDelta(oldAccount, oldPocketId, -oldAmount);
+    if (!sameAccount) await oldAccount.save();
+    applySubBalanceDelta(nextAccount, nextPocketId, nextAmount);
+    await nextAccount.save();
     const [presented] = await withIncome(req.user.id, [payment]);
     res.status(HttpStatus.OK).json({ payment: presented, debt: await refreshStatus(debt) });
   } catch (error) {
@@ -380,6 +409,10 @@ const deleteDebtPayment = async (req, res) => {
     if (!payment) {
       return res.status(HttpStatus.NOT_FOUND).json({ message: 'Debt payment not found' });
     }
+    const account = await requireOwnedAccount(Account, req.user.id, payment.accountId);
+    const pocketId = resolvePocketId(account, payment.subBalanceId);
+    applySubBalanceDelta(account, pocketId, -Number(payment.amount));
+    await account.save();
     await deleteLinkedIncome(req.user.id, payment);
     await payment.deleteOne();
     const debt = await requireDebt(req.user.id, payment.debtId);

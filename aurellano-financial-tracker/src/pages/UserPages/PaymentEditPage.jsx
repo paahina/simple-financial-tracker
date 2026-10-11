@@ -9,7 +9,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { getAccountsRequest, getCategoriesRequest, getDebtRequest, updateDebtPaymentRequest } from '../../services/api';
-import { accountOption, selectableAccounts } from '../../utils/accounts';
+import SubBalanceSelect from '../../components/SubBalanceSelect';
+import { accountById, accountOption, pocketIdForAccount, pocketOptions, selectableAccounts } from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
@@ -39,6 +40,7 @@ const PaymentEditPage = () => {
         setIncomeCategories(categories);
         const nextForm = {
           accountId: payment.accountId,
+          subBalanceId: pocketIdForAccount(accountList, payment.accountId, payment.subBalanceId || ''),
           amount: fromCentavos(payment.amount),
           paymentDate: datetimeLocalInput(payment.paymentDate),
           notes: payment.notes || '',
@@ -61,6 +63,9 @@ const PaymentEditPage = () => {
     event.preventDefault();
     const nextErrors = {
       accountId: requiredChoice(form.accountId, 'Account'),
+      subBalanceId: pocketOptions(accountById(accounts, form.accountId)).length
+        ? requiredChoice(form.subBalanceId, 'Sub-balance')
+        : '',
       amount: requiredAmount(form.amount),
       paymentDate: requiredChoice(form.paymentDate, 'Date'),
       incomeLabel: form.recordAsIncome ? requiredText(form.incomeLabel, 'Income label') : '',
@@ -75,6 +80,7 @@ const PaymentEditPage = () => {
           paymentId,
           {
             accountId: form.accountId,
+            subBalanceId: form.subBalanceId || null,
             amount: toCentavos(form.amount),
             paymentDate: datetimeLocalToIso(form.paymentDate),
             notes: form.notes,
@@ -107,9 +113,18 @@ const PaymentEditPage = () => {
         <Select
           value={form.accountId}
           options={accounts.map(accountOption)}
-          onChange={(accountId) => setForm({ ...form, accountId })}
+          onChange={(accountId) =>
+            setForm({ ...form, accountId, subBalanceId: pocketIdForAccount(accounts, accountId) })
+          }
         />
       </Field>
+      <SubBalanceSelect
+        account={accountById(accounts, form.accountId)}
+        value={form.subBalanceId}
+        error={fieldErrors.subBalanceId}
+        onChange={(subBalanceId) => setForm({ ...form, subBalanceId })}
+        label="Add to"
+      />
       <Field label="Amount (PHP)" error={fieldErrors.amount}>
         <input className={inputClass} required type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
       </Field>

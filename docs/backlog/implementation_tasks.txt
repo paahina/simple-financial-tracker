@@ -83,7 +83,7 @@ H3. Transfers use sub-balance on from/to your accounts
            TransferEditPage.jsx.
 
 H4. Follow-ups (out of initial scope unless bundled)
-    [ ] Debt payment: which pocket receives money when account has sub-balances.
+    [x] Debt payment: which pocket receives money when account has sub-balances.
     [ ] Dashboard/account detail UI showing pocket breakdown.
     QA: Account with no pockets — forms unchanged. With pockets — cannot
         expense more than slice; transfer moves slice amounts; totals match

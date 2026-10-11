@@ -348,6 +348,8 @@ test('debt payment can also create a linked income transaction without doubling 
 
   const accounts = await request(app).get('/api/accounts/getAllAccounts').set(auth(token));
   assert.equal(accounts.body[0].balance, 4000);
+  assert.equal(accounts.body[0].subBalances[0].amount, 4000);
+  assert.ok(linked.body.payment.subBalanceId);
 
   const now = new Date();
   const report = await request(app)
@@ -429,4 +431,71 @@ test('account sub-balances move with transactions and same-account transfers', a
   const nextSpend = account.body.subBalances.find((item) => item.label === 'Spend');
   assert.equal(nextSavings.amount, 10000);
   assert.equal(nextSpend.amount, 335000);
+});
+
+test('debt payment credits the chosen pocket once even with linked income', async () => {
+  const token = await register('payment-pocket@example.com');
+  const today = new Date().toISOString();
+  const categories = await request(app).get('/api/categories/getAllCategories').set(auth(token));
+  const otherIncome = categories.body.find((item) => item.name === 'Other' && item.type === 'INCOME');
+  const cash = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Cash',
+    type: 'CASH',
+    initialBalance: 10000,
+    subBalances: [
+      { label: 'Current', amount: 4000 },
+      { label: 'Spend', amount: 6000 },
+    ],
+  });
+  const current = cash.body.account.subBalances.find((item) => item.label === 'Current');
+  const spend = cash.body.account.subBalances.find((item) => item.label === 'Spend');
+  const debt = await request(app).post('/api/debts/create').set(auth(token)).send({
+    personName: 'Ben',
+    originalAmount: 10000,
+  });
+  const missingPocket = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: debt.body.debt._id,
+    accountId: cash.body.account._id,
+    amount: 2000,
+    paymentDate: today,
+  });
+  assert.equal(missingPocket.status, 400);
+
+  const linked = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: debt.body.debt._id,
+    accountId: cash.body.account._id,
+    subBalanceId: spend._id,
+    amount: 2000,
+    paymentDate: today,
+    recordAsIncome: true,
+    incomeLabel: 'Ben paid',
+    incomeCategoryId: otherIncome._id,
+  });
+  assert.equal(linked.status, 201);
+  assert.equal(String(linked.body.payment.subBalanceId), String(spend._id));
+
+  const afterCreate = await request(app).get(`/api/accounts/get/${cash.body.account._id}`).set(auth(token));
+  assert.equal(afterCreate.body.balance, 12000);
+  assert.equal(afterCreate.body.subBalances.find((item) => item.label === 'Current').amount, 4000);
+  assert.equal(afterCreate.body.subBalances.find((item) => item.label === 'Spend').amount, 8000);
+
+  const moved = await request(app)
+    .put(`/api/debts/updatePayment/${linked.body.payment._id}`)
+    .set(auth(token))
+    .send({ subBalanceId: current._id, amount: 3000 });
+  assert.equal(moved.status, 200);
+
+  const afterUpdate = await request(app).get(`/api/accounts/get/${cash.body.account._id}`).set(auth(token));
+  assert.equal(afterUpdate.body.balance, 13000);
+  assert.equal(afterUpdate.body.subBalances.find((item) => item.label === 'Current').amount, 7000);
+  assert.equal(afterUpdate.body.subBalances.find((item) => item.label === 'Spend').amount, 6000);
+
+  const removed = await request(app)
+    .delete(`/api/debts/deletePayment/${linked.body.payment._id}`)
+    .set(auth(token));
+  assert.equal(removed.status, 200);
+  const afterDelete = await request(app).get(`/api/accounts/get/${cash.body.account._id}`).set(auth(token));
+  assert.equal(afterDelete.body.balance, 10000);
+  assert.equal(afterDelete.body.subBalances.find((item) => item.label === 'Current').amount, 4000);
+  assert.equal(afterDelete.body.subBalances.find((item) => item.label === 'Spend').amount, 6000);
 });

@@ -191,6 +191,7 @@ const debtPaymentValidation = [
   body('recordAsIncome').optional().isBoolean(),
   body('incomeLabel').optional().isString().trim().isLength({ min: 1, max: 100 }),
   body('incomeCategoryId').optional().isMongoId(),
+  body('subBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
   handleValidation,
 ];
 
@@ -202,6 +203,7 @@ const debtPaymentUpdateValidation = [
   body('recordAsIncome').optional().isBoolean(),
   body('incomeLabel').optional().isString().trim().isLength({ min: 1, max: 100 }),
   body('incomeCategoryId').optional().isMongoId(),
+  body('subBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
   handleValidation,
 ];
 

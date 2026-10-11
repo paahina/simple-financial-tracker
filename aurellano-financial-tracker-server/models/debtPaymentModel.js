@@ -5,6 +5,7 @@ const debtPaymentSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     debtId: { type: mongoose.Schema.Types.ObjectId, ref: 'Debt', required: true },
     accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true },
+    subBalanceId: { type: mongoose.Schema.Types.ObjectId, default: null },
     amount: { type: Number, required: true, min: 1 },
     paymentDate: { type: Date, required: true },
     notes: { type: String, trim: true, default: '' },

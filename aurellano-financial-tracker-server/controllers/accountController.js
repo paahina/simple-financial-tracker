@@ -70,12 +70,13 @@ const getAccountById = async (req, res) => {
 
 const unusedSubBalances = async (userId, removedIds) => {
   if (!removedIds.length) return;
-  const [transactions, fromTransfers, toTransfers] = await Promise.all([
+  const [transactions, fromTransfers, toTransfers, payments] = await Promise.all([
     Transaction.countDocuments({ userId, subBalanceId: { $in: removedIds } }),
     Transfer.countDocuments({ userId, fromSubBalanceId: { $in: removedIds } }),
     Transfer.countDocuments({ userId, toSubBalanceId: { $in: removedIds } }),
+    DebtPayment.countDocuments({ userId, subBalanceId: { $in: removedIds } }),
   ]);
-  if (transactions || fromTransfers || toTransfers) {
+  if (transactions || fromTransfers || toTransfers || payments) {
     throw new FinanceError('A sub-balance is used by existing activity and cannot be removed');
   }
 };
