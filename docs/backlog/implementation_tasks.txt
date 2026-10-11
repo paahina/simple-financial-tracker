@@ -4,141 +4,105 @@ Implementation Tasks (Backlog from recent planning)
 
 Location: docs/backlog/ — working file; may be updated or overridden.
 
-This file tracks agreed work not yet fully implemented or worth verifying.
-Completed UI work (tabs, pagination, debt status, skeletons, favicon, etc.)
-is assumed shipped unless a task says otherwise.
+This file tracks agreed work not yet fully implemented.
 
 Use checkboxes when executing: [ ] todo  [x] done
 
 ----------------------------------------------------------------------
-PRIORITY A — Session / auth reliability
+PRIORITY G — Debt payment + optional INCOME transaction
 ----------------------------------------------------------------------
 
-A1. Fix session bootstrap leaving loading stuck
-    Problem: User returns after a while, sees loading; reload may send them
-    to login without using Log out.
-    Tasks:
-    [x] In AuthContext, ensure loading always clears in session check finally
-        (even when effect cleanup runs — avoid abandoned request leaving
-        loading true forever).
-    [x] Add fetch timeout or AbortController for sessionRequest so cold API
-        does not hang indefinitely.
-    [x] On session failure, distinguish 401 (clear token, sign in) vs network
-        / 5xx (show retry, optional keep token).
-    Files: aurellano-financial-tracker/src/context/AuthContext.jsx,
-           aurellano-financial-tracker/src/services/api.js (optional)
-    QA: Token in localStorage, slow/offline API, expired JWT, normal return.
-
-A2. Document JWT_EXPIRES_IN for deploy
-    [x] Note in README that session length follows JWT_EXPIRES_IN (default 7d).
-    Files: README.md, server .env.example (comment only if needed).
-
-----------------------------------------------------------------------
-PRIORITY B — Accounts: Active / Deactivated tabs
-----------------------------------------------------------------------
-
-B1. Accounts page tabs (like Debts status tabs)
-    [x] Tabs: Active (default), Deactivated.
-    [x] URL: ?tab=deactivated (Active has no query or ?tab=active).
-    [x] Server: paged getAllAccounts supports isActive filter OR client filter
-        with correct total counts for each tab (prefer server filter + counts).
-    [x] Skeleton on tab switch when a new request runs.
-    Files: AccountsPage.jsx, accountController.js, api.js, tests if shape changes.
-
-B2. Deactivated accounts excluded from money forms
-    Server already blocks inactive on transaction/transfer/payment writes.
-    [x] Dropdowns: getAccountsRequest for create/edit transaction, transfer,
-        debt payment — only isActive true (query param or client filter on
-        unpaginated list).
-    [x] Edit forms loading inactive account for old records: still show
-        selected account if editing historical row (read-only label or allow
-        display but block change to inactive for new picks).
-    Files: TransactionCreate/Edit, TransferCreate/Edit, DebtPayment pages,
-           optional GET /getAllAccounts?activeOnly=true.
-
-B3. Optional / zero balance on create and edit
-    Verify (mostly implemented):
-    [x] Create: empty current amount -> 0 centavos (optionalAmount, min 0).
-    [x] Edit: same; reject negative only.
-    [x] No HTML min="0.01" on account amount fields.
-    QA: Create account with 0; edit to 0; negative rejected.
-
-B4. Reactivate account (optional follow-up)
-    Not in original deactivate-only scope.
-    [x] If product wants Deactivated tab actions: PUT reactivate isActive true
-        with rules (no duplicate names, etc.).
+G1. Optional “also record as income” on debt payment create/edit
+    Problem: Debt payments increase account balance and reduce debt, but do
+    not appear as INCOME in transaction lists / income reporting unless
+    duplicated manually.
+    Agreed behavior:
+    [ ] On Record payment (and edit): optional checkbox, e.g. “Also record as
+        income”. NOT a transfer — only DebtPayment + Transaction type INCOME.
+    [ ] When checked on save: create two separate objects in one action:
+        (1) DebtPayment — unchanged role (debt remaining, account, amount,
+            paymentDate, notes).
+        (2) Transaction — type INCOME, same accountId, same amount, same
+            date; user supplies income categoryId and label (notes may copy
+            to description). Two Mongo documents, one user submit.
+    [ ] When unchecked: only DebtPayment (current behavior).
+    [ ] Link records (e.g. transactionId on DebtPayment or debtPaymentId on
+        Transaction) so balance is not double-counted: account balance counts
+        the money once (prefer INCOME transaction; exclude linked payment from
+        debtPayments sum in balanceForAccount). Debt remaining still sums all
+        DebtPayment amounts.
+    [ ] Update/delete payment: keep linked transaction in sync (amount, date,
+        account, category/label rules); delete one policy TBD (delete both or
+        unlink with warning).
+    Files: debtPaymentModel.js, debtController.js, transactionController.js
+           or shared service, finance.js (balanceForAccount), validationMiddleware,
+           DebtPaymentCreatePage.jsx, PaymentEditPage.jsx, api.js.
+    QA: Payment without checkbox — balance + debt only. With checkbox — debt
+        reduced, one INCOME row, balance same as without double-count. Edit/
+        delete pairs. 401/inactive account unchanged.
 
 ----------------------------------------------------------------------
-PRIORITY C — Debt description UX (partially done)
+PRIORITY H — Account sub-balances (envelopes inside one account)
 ----------------------------------------------------------------------
 
-C1. Show description on debt card and detail — DONE (verify in QA).
+H1. Data model and account CRUD for sub-balances
+    Problem: User wants named slices of one account balance (e.g. BPI total
+    PHP 3,500 with “Savings” PHP 200 and more labels), not separate accounts.
+    Agreed behavior:
+    [ ] Per account: zero or more sub-balances { label (user text), amount in
+        centavos }. Multiple labels per account. Slice amounts are portions OF
+        the real account balance, not extra money.
+    [ ] Manage on account create/edit (add/rename/remove rows; validate
+        amounts non-negative; sum of slices <= account balance, or require
+        full allocation — decide at implement time).
+    [ ] Distinct from remainingBalance (low-balance alert threshold).
+    Files: accountModel.js, accountController.js, AccountCreatePage.jsx,
+           AccountEditPage.jsx, AccountsPage.jsx (optional breakdown display).
 
-C2. Description on New debt form
-    [x] Add optional Description field to DebtCreatePage; send description in
-        createDebtRequest body (server already accepts).
-    Files: DebtCreatePage.jsx
+H2. Transactions use sub-balance when account has envelopes
+    [ ] After user picks Account on transaction create/edit: if that account
+        has sub-balances, require picker — “Deduct from” / “Add to” pocket.
+    [ ] EXPENSE: decrease chosen sub-balance by amount; account balance logic
+        unchanged (existing Transaction rules).
+    [ ] INCOME: increase chosen sub-balance by amount.
+    [ ] Account with no sub-balances: no extra field (current UX).
+    [ ] Store subBalanceId (or equivalent) on Transaction; validate slice
+        balance on expense; reverse/adjust on edit/delete.
+    Files: transactionModel.js, transactionController.js, finance helpers,
+           TransactionCreatePage.jsx, TransactionEditPage.jsx.
 
-----------------------------------------------------------------------
-PRIORITY D — Transaction type chips
-----------------------------------------------------------------------
+H3. Transfers use sub-balance on from/to your accounts
+    [ ] On transfer create/edit: when From is your account with sub-balances,
+        pick source pocket; when To is your account with sub-balances, pick
+        destination pocket.
+    [ ] Same account, different pockets allowed (reallocate inside account).
+    [ ] “Other” external sender/recipient sides: no sub-balance picker.
+    [ ] Store fromSubBalanceId / toSubBalanceId on Transfer where applicable;
+        validate source slice has enough; update both slices; total account
+        balance unchanged for internal moves.
+    Files: transferModel.js, transferController.js, TransferCreatePage.jsx,
+           TransferEditPage.jsx.
 
-D1. Shared TransactionTypeChip (or extend chip pattern)
-    [x] INCOME: blue tint (use edit / new income tokens in theme if needed).
-    [x] EXPENSE: orange/warning tint.
-    Files: new component, assets/index.js + index.css @theme if new tokens.
-
-D2. Use chips in UI
-    [x] Transactions day list (card + desktop row): replace plain EXPENSE/INCOME text.
-    [x] Optional: TransferCreate/TransactionCreate type Select — chip-like labels
-        in dropdown options or helper text (minimum: list views).
-
-----------------------------------------------------------------------
-PRIORITY E — Caching (client only; MongoDB on server)
-----------------------------------------------------------------------
-
-See docs/15_caching_rules.txt (Redis section deferred).
-
-E1. Server Redis — not used
-    [ ] Skipped: no REDIS_URL, no server read-through cache.
-
-E2. Server cache layer — not used
-    [ ] Skipped: API reads MongoDB on every request.
-
-E3. Client cache layer
-    [x] Add TanStack Query (or agreed library).
-    [x] Replace ad-hoc useEffect fetches on main list pages with useQuery;
-        staleTime 5m; invalidateQueries on mutations.
-    [x] Keep dropdown unpaginated fetches on separate keys; invalidate with lists.
-
-E4. Tests
-    [x] Finance tests pass with Mongo-only server.
-
-----------------------------------------------------------------------
-PRIORITY F — Already discussed / verify only
-----------------------------------------------------------------------
-
-F1. Debts status tabs + skeleton on switch — implemented; QA.
-F2. Dashboard / Reports tabs + skeleton where request fires — QA.
-F3. Server-side pagination on lists — implemented; QA.
-F4. Piggy favicon + navbar logo — implemented; QA.
+H4. Follow-ups (out of initial scope unless bundled)
+    [ ] Debt payment: which pocket receives money when account has sub-balances.
+    [ ] Dashboard/account detail UI showing pocket breakdown.
+    QA: Account with no pockets — forms unchanged. With pockets — cannot
+        expense more than slice; transfer moves slice amounts; totals match
+        account balance.
 
 ----------------------------------------------------------------------
 Suggested implementation order
 ----------------------------------------------------------------------
 
-1. A1 (session loading) — user-facing bug
-2. B1 + B2 (account tabs + active dropdowns)
-3. C2 + D1/D2 (debt create description + transaction chips)
-4. E1 → E3 (caching in phases)
-5. B4, E4 as needed
+1. G1 — debt payment + optional INCOME transaction (link + no double balance)
+2. H1 — account sub-balance model + account create/edit
+3. H2 — transaction create/edit pocket picker
+4. H3 — transfer create/edit from/to pockets
+5. H4 — follow-ups (debt payment pocket, dashboard breakdown) as needed
 
 ----------------------------------------------------------------------
 Commit grouping (suggested, not mandatory)
 ----------------------------------------------------------------------
 
-- fix: session bootstrap loading and auth errors
-- feat: active and deactivated account tabs
-- feat: transaction type chips
-- feat: optional debt description on create
-- feat: client query cache with five-minute stale time
+- feat: optional income transaction on debt payment
+- feat: account sub-balances on transactions and transfers
