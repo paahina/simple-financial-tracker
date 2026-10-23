@@ -204,6 +204,23 @@ export const updateDebtPaymentRequest = (id, payload, token) =>
 export const deleteDebtPaymentRequest = (id, token) =>
   apiRequest(`/api/debts/deletePayment/${id}`, { method: 'DELETE', token });
 
+export const getToBuyRequest = (token, { page, limit } = {}) =>
+  apiRequest(`/api/to-buy/getAll${toQuery({ page, limit })}`, { token });
+
+export const getToBuyItemRequest = (id, token) => apiRequest(`/api/to-buy/get/${id}`, { token });
+
+export const createToBuyRequest = (payload, token) =>
+  apiRequest('/api/to-buy/create', { method: 'POST', body: payload, token });
+
+export const updateToBuyRequest = (id, payload, token) =>
+  apiRequest(`/api/to-buy/update/${id}`, { method: 'PUT', body: payload, token });
+
+export const deleteToBuyRequest = (id, token) =>
+  apiRequest(`/api/to-buy/delete/${id}`, { method: 'DELETE', token });
+
+export const completeToBuyRequest = (id, payload, token) =>
+  apiRequest(`/api/to-buy/complete/${id}`, { method: 'POST', body: payload, token });
+
 export const getMonthlyReportRequest = (token, year, month, page = 1, limit = 10, categories = {}) =>
   apiRequest(
     `/api/reports/monthly${toQuery({

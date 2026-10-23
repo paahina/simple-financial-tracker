@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import Button, { editLinkClass } from '../../components/Button';
+import { useNavigate } from 'react-router-dom';
+import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import FormModal from '../../components/FormModal';
 import Select from '../../components/Select';
 import { transactionTypeOptions } from '../../components/TransactionTypeChip';
-import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import {
@@ -16,7 +17,14 @@ import {
 } from '../../services/api';
 import SubBalanceSelect from '../../components/SubBalanceSelect';
 import { datetimeLocalToIso, nowDatetimeLocal, toCentavos } from '../../utils/format';
-import { accountById, pocketIdForAccount, pocketOptions } from '../../utils/accounts';
+import {
+  accountById,
+  accountLabelWithBalance,
+  labelWithBalance,
+  pocketAmount,
+  pocketIdForAccount,
+  pocketOptions,
+} from '../../utils/accounts';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const draftKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -56,6 +64,7 @@ const TransactionCreatePage = () => {
   const accounts = accountsQuery.data ?? [];
   const categories = categoriesQuery.data ?? [];
   const error = actionError || accountsQuery.error?.message || categoriesQuery.error?.message || '';
+  useFormErrorToast(error);
 
   useEffect(() => {
     const node = cardRowRef.current;
@@ -119,14 +128,14 @@ const TransactionCreatePage = () => {
     }
   };
 
+  const dirty =
+    drafts.length > 1 ||
+    drafts.some((row) => row.accountId || row.categoryId || row.label.trim() || row.amount);
+
   return (
-    <section className="space-y-4">
-      <Link className={`text-sm ${editLinkClass}`} to="/transactions">
-        Back to transactions
-      </Link>
-      <h1 className="text-2xl font-semibold text-primary-shade">New transactions</h1>
-      <ErrorText message={error} />
+    <FormModal dirty={dirty} closeTo="/transactions" wide>
       <form className="space-y-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSaveAll}>
+        <h1 className="pr-8 text-2xl font-semibold text-primary-shade">New transactions</h1>
         <Field label="Date and time" error={dateError}>
           <input
             className={inputClass}
@@ -144,7 +153,7 @@ const TransactionCreatePage = () => {
             return (
               <article key={row.key} className="min-w-full shrink-0 snap-start space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
                 <p className="text-sm font-medium text-primary-shade">Entry {index + 1}</p>
-                <Field label="Account" error={errors.accountId}>
+                <Field label={accountLabelWithBalance('Account', accountById(accounts, row.accountId))} error={errors.accountId}>
                   <Select
                     value={row.accountId}
                     options={accounts.map((account) => ({ value: account._id, label: account.name }))}
@@ -222,6 +231,9 @@ const TransactionCreatePage = () => {
                 return (
                   <tr key={row.key} className="border-b border-neutral-200 align-top">
                     <td className="px-2 py-2">
+                      <p className="mb-1 text-xs text-neutral-500">
+                        {accountLabelWithBalance('Account', accountById(accounts, row.accountId))}
+                      </p>
                       <Select
                         value={row.accountId}
                         options={accounts.map((account) => ({ value: account._id, label: account.name }))}
@@ -234,6 +246,12 @@ const TransactionCreatePage = () => {
                     <td className="px-2 py-2">
                       {pocketOptions(accountById(accounts, row.accountId)).length ? (
                         <>
+                          <p className="mb-1 text-xs text-neutral-500">
+                            {labelWithBalance(
+                              row.type === 'INCOME' ? 'Add to' : 'Deduct from',
+                              pocketAmount(accountById(accounts, row.accountId), row.subBalanceId),
+                            )}
+                          </p>
                           <Select
                             value={row.subBalanceId}
                             options={pocketOptions(accountById(accounts, row.accountId))}
@@ -317,7 +335,7 @@ const TransactionCreatePage = () => {
           </Button>
         </div>
       </form>
-    </section>
+    </FormModal>
   );
 };
 

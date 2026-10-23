@@ -20,7 +20,16 @@ before(async () => {
 });
 
 beforeEach(async () => {
-  const names = ['users', 'accounts', 'categories', 'transactions', 'transfers', 'debts', 'debtpayments'];
+  const names = [
+    'users',
+    'accounts',
+    'categories',
+    'transactions',
+    'transfers',
+    'debts',
+    'debtpayments',
+    'tobuys',
+  ];
   for (const name of names) {
     await mongoose.connection.collection(name).deleteMany({});
   }
@@ -226,7 +235,7 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   assert.equal(limited.body.account.balance < limited.body.account.remainingBalance, true);
 
   const heldBack = await request(app).get('/api/dashboard/get').set(auth(token));
-  assert.equal(heldBack.body.totalMoney, 1675000);
+  assert.equal(heldBack.body.totalMoney, 1685000);
 
   const reserved = await request(app)
     .put(`/api/accounts/update/${limited.body.account._id}`)
@@ -234,7 +243,7 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
     .send({ remainingBalance: 2000 });
   assert.equal(reserved.status, 200);
   const afterReserve = await request(app).get('/api/dashboard/get').set(auth(token));
-  assert.equal(afterReserve.body.totalMoney, 1683000);
+  assert.equal(afterReserve.body.totalMoney, 1685000);
 
   const cleared = await request(app)
     .put(`/api/accounts/update/${limited.body.account._id}`)
@@ -498,4 +507,192 @@ test('debt payment credits the chosen pocket once even with linked income', asyn
   assert.equal(afterDelete.body.balance, 10000);
   assert.equal(afterDelete.body.subBalances.find((item) => item.label === 'Current').amount, 4000);
   assert.equal(afterDelete.body.subBalances.find((item) => item.label === 'Spend').amount, 6000);
+});
+
+test('contribution payers split the total and payments stay on one payer', async () => {
+  const token = await register('contribution@example.com');
+  const today = new Date().toISOString();
+  const cash = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Cash',
+    type: 'CASH',
+    initialBalance: 0,
+  });
+  const created = await request(app).post('/api/debts/create').set(auth(token)).send({
+    personName: 'Friday dinner',
+    kind: 'CONTRIBUTION',
+    originalAmount: 3000,
+    participants: [
+      { name: 'Juan', amount: 1000 },
+      { name: 'Maria', amount: 1000 },
+      { name: 'Pedro', amount: 1000 },
+    ],
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.debt.kind, 'CONTRIBUTION');
+  assert.equal(created.body.debt.totalAmount, 3000);
+  const maria = created.body.debt.participants.find((item) => item.name === 'Maria');
+
+  const missingPayer = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: created.body.debt._id,
+    accountId: cash.body.account._id,
+    amount: 500,
+    paymentDate: today,
+  });
+  assert.equal(missingPayer.status, 400);
+
+  const paidMaria = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: created.body.debt._id,
+    accountId: cash.body.account._id,
+    participantId: maria.id,
+    amount: 500,
+    paymentDate: today,
+  });
+  assert.equal(paidMaria.status, 201);
+  const afterMaria = paidMaria.body.debt.participants.find((item) => item.name === 'Maria');
+  const afterJuan = paidMaria.body.debt.participants.find((item) => item.name === 'Juan');
+  assert.equal(afterMaria.paidAmount, 500);
+  assert.equal(afterMaria.remainingAmount, 500);
+  assert.equal(afterJuan.paidAmount, 0);
+  assert.equal(paidMaria.body.debt.remainingAmount, 2500);
+
+  const tooMuch = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: created.body.debt._id,
+    accountId: cash.body.account._id,
+    participantId: maria.id,
+    amount: 501,
+    paymentDate: today,
+  });
+  assert.equal(tooMuch.status, 400);
+
+  const uneven = await request(app).post('/api/debts/create').set(auth(token)).send({
+    personName: 'Uneven',
+    kind: 'CONTRIBUTION',
+    originalAmount: 100,
+    participants: [
+      { name: 'A', amount: 34 },
+      { name: 'B', amount: 33 },
+      { name: 'C', amount: 33 },
+    ],
+  });
+  assert.equal(uneven.status, 201);
+  assert.equal(uneven.body.debt.participants[0].amount, 34);
+
+  const badSum = await request(app).post('/api/debts/create').set(auth(token)).send({
+    personName: 'Bad sum',
+    kind: 'CONTRIBUTION',
+    originalAmount: 100,
+    participants: [
+      { name: 'A', amount: 40 },
+      { name: 'B', amount: 40 },
+    ],
+  });
+  assert.equal(badSum.status, 400);
+});
+
+test('individual debt balances split the total and a payment hits one slice', async () => {
+  const token = await register('debt-balances@example.com');
+  const today = new Date().toISOString();
+  const cash = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Cash',
+    type: 'CASH',
+    initialBalance: 0,
+  });
+  const created = await request(app).post('/api/debts/create').set(auth(token)).send({
+    personName: 'Ana',
+    kind: 'INDIVIDUAL',
+    subBalances: [
+      { label: 'Current', amount: 4000 },
+      { label: 'Rent', amount: 6000 },
+    ],
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.debt.totalAmount, 10000);
+  assert.equal(created.body.debt.originalAmount, 0);
+  const rent = created.body.debt.categories.find((item) => item.label === 'Rent');
+  const current = created.body.debt.categories.find((item) => item.label === 'Current');
+
+  const missingSlice = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: created.body.debt._id,
+    accountId: cash.body.account._id,
+    amount: 1000,
+    paymentDate: today,
+  });
+  assert.equal(missingSlice.status, 400);
+
+  const paidRent = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: created.body.debt._id,
+    accountId: cash.body.account._id,
+    categoryId: rent.id,
+    amount: 1500,
+    paymentDate: today,
+  });
+  assert.equal(paidRent.status, 201);
+  const afterRent = paidRent.body.debt.categories.find((item) => item.label === 'Rent');
+  const afterCurrent = paidRent.body.debt.categories.find((item) => item.label === 'Current');
+  assert.equal(afterRent.remainingAmount, 4500);
+  assert.equal(afterCurrent.paidAmount, 0);
+  assert.equal(paidRent.body.debt.remainingAmount, 8500);
+  assert.ok(current.id);
+});
+
+test('to-buy complete records an expense and delete does not', async () => {
+  const token = await register('tobuy@example.com');
+  const cash = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Cash',
+    type: 'CASH',
+    initialBalance: 50000,
+  });
+  assert.equal(cash.status, 201);
+  const pocket = cash.body.account.subBalances[0]._id;
+
+  const created = await request(app).post('/api/to-buy/create').set(auth(token)).send({
+    name: 'Rice',
+    quantity: 2,
+    unitPrice: 15000,
+    notes: '5kg sack',
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.item.estimatedAmount, 30000);
+
+  const listed = await request(app).get('/api/to-buy/getAll?page=1&limit=10').set(auth(token));
+  assert.equal(listed.status, 200);
+  assert.equal(listed.body.total, 1);
+  assert.equal(listed.body.estimatedTotal, 30000);
+
+  const extra = await request(app).post('/api/to-buy/create').set(auth(token)).send({
+    name: 'Soap',
+    quantity: 1,
+    unitPrice: 5000,
+  });
+  assert.equal(extra.status, 201);
+  const deleted = await request(app)
+    .delete(`/api/to-buy/delete/${extra.body.item._id}`)
+    .set(auth(token));
+  assert.equal(deleted.status, 200);
+  const afterDelete = await request(app)
+    .get(`/api/accounts/get/${cash.body.account._id}`)
+    .set(auth(token));
+  assert.equal(afterDelete.body.subBalances[0].amount, 50000);
+
+  const done = await request(app)
+    .post(`/api/to-buy/complete/${created.body.item._id}`)
+    .set(auth(token))
+    .send({ accountId: cash.body.account._id, amount: 28000, subBalanceId: pocket });
+  assert.equal(done.status, 201);
+  assert.equal(done.body.transaction.type, 'EXPENSE');
+  assert.equal(done.body.transaction.label, 'Rice');
+  assert.equal(done.body.transaction.amount, 28000);
+  assert.equal(done.body.transaction.description, '5kg sack');
+
+  const categories = await request(app).get('/api/categories/getAllCategories').set(auth(token));
+  const shopping = categories.body.find((item) => item.name === 'Shopping' && item.type === 'EXPENSE');
+  assert.equal(String(done.body.transaction.categoryId), String(shopping._id));
+
+  const remaining = await request(app).get('/api/to-buy/getAll?page=1&limit=10').set(auth(token));
+  assert.equal(remaining.body.total, 0);
+
+  const account = await request(app)
+    .get(`/api/accounts/get/${cash.body.account._id}`)
+    .set(auth(token));
+  assert.equal(account.body.subBalances[0].amount, 22000);
 });

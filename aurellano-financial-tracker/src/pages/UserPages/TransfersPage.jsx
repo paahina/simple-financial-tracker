@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
 import DayGroupList from '../../components/DayGroupList';
 import DayListDrawer from '../../components/DayListDrawer';
@@ -20,6 +20,7 @@ import {
 import { formatDateTime, formatDayKey, formatPeso, localDayBoundsIso } from '../../utils/format';
 
 const TransfersPage = () => {
+  const location = useLocation();
   const { token } = useAuth();
   const { notify } = useToast();
   const confirm = useConfirm();
@@ -135,7 +136,11 @@ const TransfersPage = () => {
                 {selectedDay ? formatDayKey(selectedDay.date) : 'Entries'}
               </h2>
             </div>
-            <Link className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0 hover:bg-primary-shade" to="/transfers/new">
+            <Link
+              className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0 hover:bg-primary-shade"
+              to="/transfers/new"
+              state={{ backgroundLocation: location }}
+            >
               New transfer
             </Link>
           </div>

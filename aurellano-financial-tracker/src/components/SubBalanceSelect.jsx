@@ -1,12 +1,13 @@
 import Field from './Field';
 import Select from './Select';
-import { pocketOptions } from '../utils/accounts';
+import { labelWithBalance, pocketAmount, pocketOptions } from '../utils/accounts';
 
 const SubBalanceSelect = ({ account, value, onChange, error, label = 'Sub-balance' }) => {
   const options = pocketOptions(account);
   if (!options.length) return null;
+  const amount = value ? pocketAmount(account, value) : null;
   return (
-    <Field label={label} error={error}>
+    <Field label={labelWithBalance(label, amount)} error={error}>
       <Select value={value} options={options} onChange={onChange} />
     </Field>
   );

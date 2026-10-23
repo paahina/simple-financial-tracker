@@ -1,107 +1,196 @@
-SIMPLE FINANCIAL TRACKER
-Implementation Tasks (Backlog from recent planning)
-===================================================
+# Financial Tracker — Development Backlog
 
-Location: docs/backlog/ — working file; may be updated or overridden.
-
-This file tracks agreed work. G1 and H1–H3 are implemented; H4 is still open.
-
-Use checkboxes when executing: [ ] todo  [x] done
+Working checklist for planned work. Stable specs live under docs/ (e.g.
+05_data_model.txt, 15_caching_rules.txt).
 
 ----------------------------------------------------------------------
-PRIORITY G — Debt payment + optional INCOME transaction
+Already in production codebase (do not re-implement)
 ----------------------------------------------------------------------
 
-G1. Optional “also record as income” on debt payment create/edit
-    Problem: Debt payments increase account balance and reduce debt, but do
-    not appear as INCOME in transaction lists / income reporting unless
-    duplicated manually.
-    Agreed behavior:
-    [x] On Record payment (and edit): optional checkbox, e.g. “Also record as
-        income”. NOT a transfer — only DebtPayment + Transaction type INCOME.
-    [x] When checked on save: create two separate objects in one action:
-        (1) DebtPayment — unchanged role (debt remaining, account, amount,
-            paymentDate, notes).
-        (2) Transaction — type INCOME, same accountId, same amount, same
-            date; user supplies income categoryId and label (notes may copy
-            to description). Two Mongo documents, one user submit.
-    [x] When unchecked: only DebtPayment (current behavior).
-    [x] Link records (e.g. transactionId on DebtPayment or debtPaymentId on
-        Transaction) so balance is not double-counted: account balance counts
-        the money once (prefer INCOME transaction; exclude linked payment from
-        debtPayments sum in balanceForAccount). Debt remaining still sums all
-        DebtPayment amounts.
-    [x] Update/delete payment: keep linked transaction in sync (amount, date,
-        account, category/label). Deleting the payment deletes the linked
-        income too; the income row cannot be edited from Transactions.
-    Files: debtPaymentModel.js, debtController.js, transactionController.js
-           or shared service, finance.js (balanceForAccount), validationMiddleware,
-           DebtPaymentCreatePage.jsx, PaymentEditPage.jsx, api.js.
-    QA: Payment without checkbox — balance + debt only. With checkbox — debt
-        reduced, one INCOME row, balance same as without double-count. Edit/
-        delete pairs. 401/inactive account unchanged.
+[x] Account sub-balances (pockets), including default Current pocket.
+[x] Transaction / transfer / debt payment pocket pickers; pocket deltas on save.
+[x] Debt payment optional linked INCOME (no double-count on account balance).
+[x] TanStack Query invalidation on debt payment create/edit (accounts, etc.).
 
 ----------------------------------------------------------------------
-PRIORITY H — Account sub-balances (envelopes inside one account)
+Agreed v1 build order
 ----------------------------------------------------------------------
 
-H1. Data model and account CRUD for sub-balances
-    Problem: User wants named slices of one account balance (e.g. BPI total
-    PHP 3,500 with “Savings” PHP 200 and more labels), not separate accounts.
-    Agreed behavior:
-    [x] Per account: at least one sub-balance (default label “Current”).
-        Account total is the sum of pockets. Current amount on create/edit is
-        read-only. Remaining-balance chip still uses that total.
-    [x] Manage on account create/edit (add/rename/remove rows; cannot remove
-        the last row). Lazy backfill Current on read for older accounts.
-    [x] Distinct from remainingBalance (low-balance alert threshold).
-    Files: accountModel.js, accountController.js, AccountCreatePage.jsx,
-           AccountEditPage.jsx, AccountsPage.jsx (optional breakdown display).
-
-H2. Transactions use sub-balance when account has envelopes
-    [x] After user picks Account on transaction create/edit: if that account
-        has sub-balances, require picker — “Deduct from” / “Add to” pocket.
-    [x] EXPENSE: decrease chosen sub-balance by amount; account balance logic
-        unchanged (existing Transaction rules).
-    [x] INCOME: increase chosen sub-balance by amount.
-    [x] Account with no sub-balances: no extra field (current UX).
-    [x] Store subBalanceId (or equivalent) on Transaction; validate slice
-        balance on expense; reverse/adjust on edit/delete.
-    Files: transactionModel.js, transactionController.js, finance helpers,
-           TransactionCreatePage.jsx, TransactionEditPage.jsx.
-
-H3. Transfers use sub-balance on from/to your accounts
-    [x] On transfer create/edit: when From is your account with sub-balances,
-        pick source pocket; when To is your account with sub-balances, pick
-        destination pocket.
-    [x] Same account, different pockets allowed (reallocate inside account).
-    [x] “Other” external sender/recipient sides: no sub-balance picker.
-    [x] Store fromSubBalanceId / toSubBalanceId on Transfer where applicable;
-        validate source slice has enough; update both slices; total account
-        balance unchanged for internal moves.
-    Files: transferModel.js, transferController.js, TransferCreatePage.jsx,
-           TransferEditPage.jsx.
-
-H4. Follow-ups (out of initial scope unless bundled)
-    [x] Debt payment: which pocket receives money when account has sub-balances.
-    [ ] Dashboard/account detail UI showing pocket breakdown.
-    QA: Account with no pockets — forms unchanged. With pockets — cannot
-        expense more than slice; transfer moves slice amounts; totals match
-        account balance.
+1. 1.1 + 1.2 — One category + amount; Individual vs Contribution on create
+2. (done with 1.1) Contribution payers, equal split, per-payer payments
+3. 3.2 — To-Buy list (minimal v1; no budget) — done
+4. Later — 3.1 Bills, then 3.3 extended Debts kinds (see below)
 
 ----------------------------------------------------------------------
-Suggested implementation order
+Open decisions (resolve when starting that feature)
 ----------------------------------------------------------------------
 
-1. G1 — debt payment + optional INCOME transaction (link + no double balance)
-2. H1 — account sub-balance model + account create/edit
-3. H2 — transaction create/edit pocket picker
-4. H3 — transfer create/edit from/to pockets
-5. H4 — follow-ups (debt payment pocket, dashboard breakdown) as needed
+1.1/1.2 — Done: one category + one amount; Name = person or group title;
+      Contribution splits equally (first payer gets leftover centavos);
+      edited shares stay put; debt PAID when remaining is 0.
 
-----------------------------------------------------------------------
-Commit grouping (suggested, not mandatory)
-----------------------------------------------------------------------
+======================================================================
+1. Debt Management
+======================================================================
 
-- feat: optional income transaction on debt payment
-- feat: account sub-balances on transactions and transfers
+### 1.1. Add Debt Categories
+**Priority:** High | **Status:** [x] One category per debt; create uses a single amount + label
+
+**Scope:** Individual debts only. Contribution debts (1.2) do not use category
+lines.
+
+**Objective:** Categorize what is owed and track payments per category with
+separate due dates.
+
+**Requirements:**
+- Create or select a category when adding or managing an individual debt.
+- Predefined categories and/or custom categories (see open decisions).
+- Display categories under the debt record.
+- Each category line: label, original amount, due date, paid, remaining.
+- Overall debt owed = sum of category remaining (or equivalent rules).
+- Extend current Debt + DebtPayment workflow; do not replace it.
+- Payments must update the correct category balance (allocation TBD in open
+  decisions).
+
+**Example:**
+
+Total debt ₱10,000:
+- Food: ₱3,000, due Oct 25
+- Rent: ₱5,000, due Oct 30
+- Utilities: ₱2,000, due Nov 5
+
+**Acceptance criteria:**
+- CRUD category lines on individual debts.
+- Independent due dates per line.
+- Payments reduce the correct line; totals stay consistent.
+- Existing individual debts and payments keep working (lazy backfill if needed).
+
+**Notes vs today:** Debt has originalAmount, additions (extra owed lines without
+per-line due/paid), and payments at debt level only — extend or replace
+additions pattern as needed for 1.1.
+
+---
+
+### 1.2. Contribution (shared debt / ambagan)
+**Priority:** High | **Status:** [x] Implemented (create toggle, payers, per-payer payments)
+
+**UI label:** **Contribution** (not “Ambagan” in the interface).
+
+**Objective:** One shared receivable with multiple participants, each with a
+fixed share and independent payment tracking.
+
+**Model (agreed):**
+- Same Debt entity with a **kind**: Individual (default) vs **Contribution**.
+- Extend existing Debts UI; distinguish Contribution in list and detail.
+- **No** 1.1 category lines on Contribution debts (participants only).
+
+**Requirements:**
+- Add participants by name; each has an expected share (centavos).
+- **Validation:** sum of participant shares must equal debt total.
+- Per participant: paid amount, remaining, status (unpaid / partial / paid).
+- Record payments **per participant** (does not change other participants).
+- Show total expected, total collected, remaining.
+- Payment behavior matches current debt payments: money into **account** (+ pocket
+  when account has sub-balances); optional **record as income** checkbox.
+- **Cap:** a participant payment cannot exceed that participant’s remaining share.
+
+**Example:**
+
+₱3,000 shared; Juan ₱1,000 paid; Maria ₱500 of ₱1,000; Pedro ₱0 of ₱1,000.
+Collected ₱1,500; remaining ₱1,500.
+
+**Acceptance criteria:**
+- CRUD participants on Contribution debts.
+- Per-participant payments and caps.
+- Contribution vs Individual visible in UI.
+- No duplicate cash counting (same rules as linked income on debt payments).
+
+======================================================================
+3. Additional features
+======================================================================
+
+### 3.1. Bills management page
+**Priority:** Medium | **Status:** [ ] Deferred (after 3.2 in v1 plan)
+
+Unchanged product intent: dedicated Bills page, due-date buckets, mark paid,
+totals for unpaid/overdue. Implement after core v1 order above.
+
+---
+
+### 3.2. To-Buy list (v1 — minimal)
+**Priority:** Medium | **Status:** [x] Implemented (CRUD, Done → Shopping expense, hard delete)
+
+**Objective:** Plan purchases; completing an item records a real expense and
+removes the row.
+
+**Persistence:** Items stored in the database (not ephemeral).
+
+**v1 fields:**
+- Item name (also used as expense label when done)
+- Quantity, estimated unit price (centavos)
+- Optional notes
+- **No** purchase budget in v1
+- Show line estimate (qty × unit price) and list estimated total
+
+**Delete:**
+- Hard delete with confirmation.
+- Does **not** create a transaction.
+
+**Done (per item):**
+- Button opens confirmation dialog (like transaction create, simplified):
+  - **Account** (required)
+  - **Deduct from** sub-balance when account has pockets (same as transactions)
+  - **Amount** (required, starts **empty** — user enters actual paid amount)
+- On confirm: create **EXPENSE** with label = item name; category **Shopping**
+  (falls back to the first active expense category if Shopping is missing).
+- Then **hard delete** the to-buy item (no “purchased” archive in v1).
+
+**Acceptance criteria:**
+- CRUD active list items; estimates recalc on edit.
+- Done → expense + item removed from DB.
+- Delete → item removed, no expense.
+- Account/pocket balances update once; invalidate accounts/transactions/dashboard.
+
+---
+
+### 3.3. Salary, personal debts, people who owe you
+**Priority:** Medium | **Status:** [ ] Deferred
+
+**Direction (agreed):** Extend the **current Debts page** with record **kinds**
+(e.g. salary receivable, my debt / liability, people owe you) and **filters** —
+not a separate hub in v1 of this feature.
+
+Keep financial rules from original spec: receivables ≠ cash; no double-count with
+linked transactions; liabilities separate from receivables summaries.
+
+======================================================================
+4. General implementation guidelines
+======================================================================
+
+1. Inspect codebase first (models, finance.js, controllers, pages, tests).
+2. Extend working features; avoid destructive schema changes.
+3. Amounts in centavos; validate payments and caps.
+4. Prevent duplicate accounting (linked income, pocket deltas once).
+5. Match existing UI patterns (FormModal, ConfirmProvider, invalidateFamilies).
+6. Add/update server tests for new money paths.
+7. Implement one backlog section at a time per agreed order.
+
+**Core principle:** Available cash, receivables, unpaid salary, and personal
+liabilities stay separate. Future money is not spendable cash.
+
+======================================================================
+5. Definition of done (per feature)
+======================================================================
+
+- UI workflow complete with loading/empty/error states.
+- Data persists across refresh.
+- Calculations and summaries correct.
+- Tests pass; existing flows still work.
+
+======================================================================
+6. Agent workflow
+======================================================================
+
+Before coding a section: restate scope, resolve any open decisions for that
+section, then implement. Summarize files changed and QA steps when finished.
+Do not commit unless the user asks.

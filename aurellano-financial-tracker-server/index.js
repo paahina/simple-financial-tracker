@@ -9,6 +9,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const transferRoutes = require('./routes/transferRoutes');
 const debtRoutes = require('./routes/debtRoutes');
+const toBuyRoutes = require('./routes/toBuyRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 
@@ -80,6 +81,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/transfers', transferRoutes);
 app.use('/api/debts', debtRoutes);
+app.use('/api/to-buy', toBuyRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
 

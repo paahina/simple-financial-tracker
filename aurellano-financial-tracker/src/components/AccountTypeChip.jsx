@@ -16,6 +16,10 @@ const AccountTypeChip = ({ type }) => (
   </span>
 );
 
+export const ProtectedChip = () => (
+  <span className="rounded-full bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning">Protected</span>
+);
+
 export const accountTypeOptions = [
   { value: 'CASH', label: <AccountTypeChip type="CASH" /> },
   { value: 'E_WALLET', label: <AccountTypeChip type="E_WALLET" /> },

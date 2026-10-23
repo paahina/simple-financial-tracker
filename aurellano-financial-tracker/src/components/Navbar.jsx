@@ -5,6 +5,7 @@ import {
   EyeOff,
   HandCoins,
   LayoutDashboard,
+  ShoppingCart,
   LogOut,
   PieChart,
   Receipt,
@@ -25,6 +26,7 @@ const links = [
   ['/transactions', 'Transactions', Receipt],
   ['/transfers', 'Transfers', ArrowLeftRight],
   ['/debts', 'Debts', HandCoins],
+  ['/to-buy', 'To-Buy', ShoppingCart],
   ['/reports', 'Reports', PieChart],
 ];
 

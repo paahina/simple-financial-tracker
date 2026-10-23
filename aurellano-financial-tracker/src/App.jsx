@@ -35,6 +35,9 @@ import TransactionsPage from './pages/UserPages/TransactionsPage';
 import TransferCreatePage from './pages/UserPages/TransferCreatePage';
 import TransferEditPage from './pages/UserPages/TransferEditPage';
 import TransfersPage from './pages/UserPages/TransfersPage';
+import ToBuyCompletePage from './pages/UserPages/ToBuyCompletePage';
+import ToBuyFormPage from './pages/UserPages/ToBuyFormPage';
+import ToBuyPage from './pages/UserPages/ToBuyPage';
 
 const router = createBrowserRouter([
   {
@@ -79,6 +82,10 @@ const router = createBrowserRouter([
           { path: '/debts/:id/edit', element: <DebtEditPage /> },
           { path: '/debts/:id/payments/:paymentId/edit', element: <PaymentEditPage /> },
           { path: '/debts/:id', element: <DebtDetailPage /> },
+          { path: '/to-buy', element: <ToBuyPage /> },
+          { path: '/to-buy/new', element: <ToBuyFormPage /> },
+          { path: '/to-buy/:id/edit', element: <ToBuyFormPage /> },
+          { path: '/to-buy/:id/done', element: <ToBuyCompletePage /> },
           { path: '/reports', element: <ReportsPage /> },
         ],
       },

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
-import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 
 const SignInPage = () => {
   const { login } = useAuth();
@@ -11,6 +11,7 @@ const SignInPage = () => {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  useFormErrorToast(error);
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -47,7 +48,6 @@ const SignInPage = () => {
           onChange={(event) => setForm({ ...form, password: event.target.value })}
         />
       </Field>
-      <ErrorText message={error} />
       <Button className="w-full" variant="primary" disabled={submitting} type="submit">
         {submitting ? 'Signing in...' : 'Sign in'}
       </Button>

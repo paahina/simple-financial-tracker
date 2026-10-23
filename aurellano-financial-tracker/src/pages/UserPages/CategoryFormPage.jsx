@@ -4,8 +4,9 @@ import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
-import { ErrorText, Loading } from '../../components/StatusMessage';
+import { Empty, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { createCategoryRequest, getCategoryRequest, updateCategoryRequest } from '../../services/api';
@@ -22,6 +23,7 @@ const CategoryFormPage = () => {
   const [baseline, setBaseline] = useState(editing ? '' : JSON.stringify(emptyForm));
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  useFormErrorToast(error);
 
   useEffect(() => {
     if (!editing) return undefined;
@@ -68,12 +70,11 @@ const CategoryFormPage = () => {
 
   return (
     <FormModal dirty={dirty} closeTo="/categories">
-      {error && !form && <ErrorText message={error} />}
+      {error && !form && <Empty label="Couldn't load this form." />}
       {!form && !error && <Loading variant="form" />}
       {form && (
     <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
       <h1 className="pr-8 text-2xl font-semibold text-primary-shade">{editing ? 'Edit category' : 'New category'}</h1>
-      <ErrorText message={error} />
       <Field label="Name" error={fieldErrors.name}>
         <input className={inputClass} required minLength={2} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
       </Field>

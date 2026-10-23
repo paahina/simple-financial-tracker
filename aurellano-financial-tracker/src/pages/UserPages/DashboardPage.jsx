@@ -62,7 +62,7 @@ const DashboardPage = () => {
   if (!data) return <Loading variant={tab === 'transactions' ? 'dashboardTransactions' : 'dashboard'} />;
 
   const cards = [
-    ['Cash on hand', data.totalMoney],
+    ['Total balance', data.totalBalance],
     ['Income this month', data.monthlyIncome],
     ['Expenses this month', data.monthlyExpenses],
     ['Net this month', data.monthlyNet],
@@ -99,7 +99,7 @@ const DashboardPage = () => {
                 {data.accountBalances.data.map((account) => (
                   <article key={account.id} className="rounded-lg border border-neutral-200 bg-neutral-0 p-4">
                     <p className="font-medium">{account.name}</p>
-                    <span className="mt-1 block">
+                    <span className="mt-1 flex flex-wrap items-center gap-1">
                       <AccountTypeChip type={account.type} />
                     </span>
                     <Money className="mt-2 block text-primary-shade" centavos={account.balance} />

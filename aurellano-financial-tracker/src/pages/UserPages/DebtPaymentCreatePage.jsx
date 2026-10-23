@@ -5,13 +5,15 @@ import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
-import { ErrorText, Loading } from '../../components/StatusMessage';
+import { Empty, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
-import { createDebtPaymentRequest, getAccountsRequest, getCategoriesRequest } from '../../services/api';
+import { createDebtPaymentRequest, getAccountsRequest, getCategoriesRequest, getDebtRequest } from '../../services/api';
 import SubBalanceSelect from '../../components/SubBalanceSelect';
-import { accountById, pocketIdForAccount, pocketOptions } from '../../utils/accounts';
+import { accountById, accountLabelWithBalance, pocketIdForAccount, pocketOptions } from '../../utils/accounts';
+import { categoryIdForDebt, categoryOptions, payloadCategoryId } from '../../utils/debts';
 import { datetimeLocalToIso, nowDatetimeLocal, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
@@ -22,6 +24,8 @@ const DebtPaymentCreatePage = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     accountId: '',
+    categoryId: '',
+    participantId: '',
     subBalanceId: '',
     amount: '',
     paymentDate: nowDatetimeLocal(),
@@ -34,6 +38,11 @@ const DebtPaymentCreatePage = () => {
   const [fieldErrors, setFieldErrors] = useState({});
   const closeTo = `/debts/${id}?tab=payments`;
 
+  const debtQuery = useQuery({
+    queryKey: ['debts', id],
+    queryFn: () => getDebtRequest(id, token),
+    enabled: Boolean(token),
+  });
   const accountsQuery = useQuery({
     queryKey: ['accounts', 'options', { activeOnly: true }],
     queryFn: () => getAccountsRequest(token, { activeOnly: true }),
@@ -45,13 +54,24 @@ const DebtPaymentCreatePage = () => {
     enabled: Boolean(token),
   });
   const accounts = accountsQuery.data ?? null;
+  const debt = debtQuery.data?.debt;
+  const debtCategories = debt?.categories ?? [];
+  const payers = debt?.participants ?? [];
   const incomeCategories = categoriesQuery.data ?? [];
-  const error = actionError || accountsQuery.error?.message || categoriesQuery.error?.message || '';
+  const error =
+    actionError ||
+    debtQuery.error?.message ||
+    accountsQuery.error?.message ||
+    categoriesQuery.error?.message ||
+    '';
+  useFormErrorToast(error);
 
   const onSubmit = async (event) => {
     event.preventDefault();
     const nextErrors = {
       accountId: requiredChoice(form.accountId, 'Account'),
+      participantId: debt?.kind === 'CONTRIBUTION' ? requiredChoice(form.participantId, 'Payer') : '',
+      categoryId: categoryOptions(debtCategories).length > 1 ? requiredChoice(form.categoryId, 'Category') : '',
       subBalanceId: pocketOptions(accountById(accounts, form.accountId)).length
         ? requiredChoice(form.subBalanceId, 'Sub-balance')
         : '',
@@ -69,6 +89,8 @@ const DebtPaymentCreatePage = () => {
           {
             debtId: id,
             accountId: form.accountId,
+            participantId: form.participantId || null,
+            categoryId: payloadCategoryId(form.categoryId || categoryIdForDebt(debtCategories)),
             subBalanceId: form.subBalanceId || null,
             amount: toCentavos(form.amount),
             paymentDate: datetimeLocalToIso(form.paymentDate),
@@ -91,13 +113,15 @@ const DebtPaymentCreatePage = () => {
 
   return (
     <FormModal dirty={dirty} closeTo={closeTo}>
-      {error && !accounts && <ErrorText message={error} />}
+      {error && !accounts && <Empty label="Couldn't load this form." />}
       {!accounts && !error && <Loading variant="form" />}
-      {accounts && (
+      {accounts && debtQuery.data && (
         <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
           <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Record a payment</h1>
-          <ErrorText message={error} />
-          <Field label="Money goes into" error={fieldErrors.accountId}>
+          <Field
+            label={accountLabelWithBalance('Money goes into', accountById(accounts, form.accountId))}
+            error={fieldErrors.accountId}
+          >
             <Select
               value={form.accountId}
               options={accounts.map((account) => ({ value: account._id, label: account.name }))}
@@ -106,6 +130,24 @@ const DebtPaymentCreatePage = () => {
               }
             />
           </Field>
+          {debt?.kind === 'CONTRIBUTION' ? (
+            <Field label="Who paid" error={fieldErrors.participantId}>
+              <Select
+                value={form.participantId}
+                options={payers.map((payer) => ({ value: payer.id, label: payer.name }))}
+                onChange={(participantId) => setForm({ ...form, participantId })}
+              />
+            </Field>
+          ) : null}
+          {categoryOptions(debtCategories).length > 1 ? (
+            <Field label="Apply to" error={fieldErrors.categoryId}>
+              <Select
+                value={form.categoryId || categoryIdForDebt(debtCategories)}
+                options={categoryOptions(debtCategories)}
+                onChange={(categoryId) => setForm({ ...form, categoryId })}
+              />
+            </Field>
+          ) : null}
           <SubBalanceSelect
             account={accountById(accounts, form.accountId)}
             value={form.subBalanceId}

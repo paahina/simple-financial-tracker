@@ -3,12 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import FormModal from '../../components/FormModal';
-import { ErrorText, Loading } from '../../components/StatusMessage';
+import { Empty, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { getDebtRequest, updateDebtAdditionRequest } from '../../services/api';
-import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
+import { dateInput, datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos, toIsoDate } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const DebtAdditionEditPage = () => {
@@ -20,6 +21,7 @@ const DebtAdditionEditPage = () => {
   const [baseline, setBaseline] = useState('');
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  useFormErrorToast(error);
   const closeTo = `/debts/${id}?tab=additions`;
 
   useEffect(() => {
@@ -29,12 +31,13 @@ const DebtAdditionEditPage = () => {
         if (!active) return;
         const line = debt.additions?.find((item) => item._id === additionId);
         if (!line) {
-          setError('Added amount not found');
+          setError('Category not found');
           return;
         }
         const nextForm = {
           label: line.label,
           amount: fromCentavos(line.amount),
+          dueDate: line.dueDate ? dateInput(line.dueDate) : '',
           createdAt: datetimeLocalInput(line.createdAt),
         };
         setForm(nextForm);
@@ -66,12 +69,13 @@ const DebtAdditionEditPage = () => {
             label: form.label.trim(),
             amount: toCentavos(form.amount),
             createdAt: datetimeLocalToIso(form.createdAt),
+            dueDate: form.dueDate ? toIsoDate(form.dueDate) : null,
           },
           token,
         );
         navigate(closeTo);
         invalidateFamilies('debts', 'dashboard');
-        notify('Added amount updated');
+        notify('Category updated');
       });
     } catch (err) {
       setError(err.message);
@@ -82,12 +86,11 @@ const DebtAdditionEditPage = () => {
 
   return (
     <FormModal dirty={dirty} closeTo={closeTo}>
-      {error && !form && <ErrorText message={error} />}
+      {error && !form && <Empty label="Couldn't load this form." />}
       {!form && !error && <Loading variant="form" />}
       {form && (
         <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
-          <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit added amount</h1>
-          <ErrorText message={error} />
+          <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit category</h1>
           <Field label="Label" error={fieldErrors.label}>
             <input
               className={inputClass}
@@ -105,6 +108,14 @@ const DebtAdditionEditPage = () => {
               step="0.01"
               value={form.amount}
               onChange={(event) => setForm({ ...form, amount: event.target.value })}
+            />
+          </Field>
+          <Field label="Due date">
+            <input
+              className={inputClass}
+              type="date"
+              value={form.dueDate}
+              onChange={(event) => setForm({ ...form, dueDate: event.target.value })}
             />
           </Field>
           <Field label="Date and time" error={fieldErrors.createdAt}>

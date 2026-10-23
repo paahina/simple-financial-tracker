@@ -1,17 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import Button, { editLinkClass } from '../../components/Button';
+import { useNavigate } from 'react-router-dom';
+import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
+import FormModal from '../../components/FormModal';
 import Select from '../../components/Select';
-import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import { createTransferRequest, getAccountsRequest } from '../../services/api';
 import SubBalanceSelect from '../../components/SubBalanceSelect';
 import { datetimeLocalToIso, nowDatetimeLocal, toCentavos } from '../../utils/format';
-import { accountById, pocketIdForAccount, pocketOptions } from '../../utils/accounts';
+import {
+  accountById,
+  accountLabelWithBalance,
+  labelWithBalance,
+  pocketAmount,
+  pocketIdForAccount,
+  pocketOptions,
+} from '../../utils/accounts';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const draftKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -46,6 +54,7 @@ const TransferCreatePage = () => {
   });
   const activeAccounts = accountsQuery.data ?? [];
   const error = actionError || accountsQuery.error?.message || '';
+  useFormErrorToast(error);
 
   useEffect(() => {
     const node = cardRowRef.current;
@@ -130,14 +139,17 @@ const TransferCreatePage = () => {
     }
   };
 
+  const dirty =
+    drafts.length > 1 ||
+    drafts.some(
+      (row) =>
+        row.fromAccountId || row.toAccountId || row.senderName.trim() || row.recipientName.trim() || row.amount,
+    );
+
   return (
-    <section className="space-y-4">
-      <Link className={`text-sm ${editLinkClass}`} to="/transfers">
-        Back to transfers
-      </Link>
-      <h1 className="text-2xl font-semibold text-primary-shade">New transfers</h1>
-      <ErrorText message={error} />
+    <FormModal dirty={dirty} closeTo="/transfers" wide>
       <form className="space-y-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSaveAll}>
+        <h1 className="pr-8 text-2xl font-semibold text-primary-shade">New transfers</h1>
         <Field label="Date and time" error={dateError}>
           <input
             className={inputClass}
@@ -154,7 +166,13 @@ const TransferCreatePage = () => {
             return (
               <article key={row.key} className="min-w-full shrink-0 snap-start space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
                 <p className="text-sm font-medium text-primary-shade">Entry {index + 1}</p>
-                <Field label="From" error={errors.fromAccountId}>
+                <Field
+                  label={accountLabelWithBalance(
+                    'From',
+                    row.fromAccountId !== 'other' ? accountById(activeAccounts, row.fromAccountId) : null,
+                  )}
+                  error={errors.fromAccountId}
+                >
                   <Select
                     value={row.fromAccountId}
                     options={[
@@ -188,7 +206,13 @@ const TransferCreatePage = () => {
                     />
                   </Field>
                 ) : null}
-                <Field label="To" error={errors.toAccountId}>
+                <Field
+                  label={accountLabelWithBalance(
+                    'To',
+                    row.toAccountId !== 'other' ? accountById(activeAccounts, row.toAccountId) : null,
+                  )}
+                  error={errors.toAccountId}
+                >
                   <Select
                     value={row.toAccountId}
                     options={[
@@ -257,6 +281,12 @@ const TransferCreatePage = () => {
                 return (
                   <tr key={row.key} className="border-b border-neutral-200 align-top">
                     <td className="space-y-2 px-2 py-2">
+                      <p className="text-xs text-neutral-500">
+                        {accountLabelWithBalance(
+                          'From',
+                          row.fromAccountId !== 'other' ? accountById(activeAccounts, row.fromAccountId) : null,
+                        )}
+                      </p>
                       <Select
                         value={row.fromAccountId}
                         options={[
@@ -276,6 +306,12 @@ const TransferCreatePage = () => {
                       ) : null}
                       {pocketOptions(accountById(activeAccounts, row.fromAccountId)).length && row.fromAccountId !== 'other' ? (
                         <>
+                          <p className="text-xs text-neutral-500">
+                            {labelWithBalance(
+                              'From sub-balance',
+                              pocketAmount(accountById(activeAccounts, row.fromAccountId), row.fromSubBalanceId),
+                            )}
+                          </p>
                           <Select
                             value={row.fromSubBalanceId}
                             options={pocketOptions(accountById(activeAccounts, row.fromAccountId))}
@@ -303,6 +339,12 @@ const TransferCreatePage = () => {
                       ) : null}
                     </td>
                     <td className="space-y-2 px-2 py-2">
+                      <p className="text-xs text-neutral-500">
+                        {accountLabelWithBalance(
+                          'To',
+                          row.toAccountId !== 'other' ? accountById(activeAccounts, row.toAccountId) : null,
+                        )}
+                      </p>
                       <Select
                         value={row.toAccountId}
                         options={[
@@ -319,6 +361,12 @@ const TransferCreatePage = () => {
                       {errors.toAccountId ? <p className="text-xs text-error-foreground">{errors.toAccountId}</p> : null}
                       {pocketOptions(accountById(activeAccounts, row.toAccountId)).length && row.toAccountId !== 'other' ? (
                         <>
+                          <p className="text-xs text-neutral-500">
+                            {labelWithBalance(
+                              'To sub-balance',
+                              pocketAmount(accountById(activeAccounts, row.toAccountId), row.toSubBalanceId),
+                            )}
+                          </p>
                           <Select
                             value={row.toSubBalanceId}
                             options={pocketOptions(accountById(activeAccounts, row.toAccountId))}
@@ -390,7 +438,7 @@ const TransferCreatePage = () => {
           </Button>
         </div>
       </form>
-    </section>
+    </FormModal>
   );
 };
 

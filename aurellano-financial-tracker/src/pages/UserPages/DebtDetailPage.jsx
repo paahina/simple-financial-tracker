@@ -10,7 +10,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
-import { deleteDebtAdditionRequest, deleteDebtPaymentRequest, getAccountsRequest, getDebtRequest } from '../../services/api';
+import { deleteDebtPaymentRequest, getAccountsRequest, getDebtRequest } from '../../services/api';
 import { formatDate, formatDateTime, formatPeso } from '../../utils/format';
 
 const DebtDetailPage = () => {
@@ -61,32 +61,10 @@ const DebtDetailPage = () => {
   }, [load]);
 
   const nameOf = (accountId) => accounts.find((account) => account._id === accountId)?.name || 'Account';
-
-  const onDeleteAddition = async (additionId) => {
-    const accepted = await confirm({
-      title: 'Delete added amount?',
-      message: 'This removes the added amount and updates what is still owed.',
-      confirmLabel: 'Delete',
-      confirmVariant: 'danger',
-      confirmIcon: Trash2,
-    });
-    if (!accepted) return;
-    try {
-      await afterSave(async () => {
-        await deleteDebtAdditionRequest(additionId, token);
-        setDebt(null);
-        invalidateFamilies('debts', 'dashboard');
-        notify('Added amount deleted');
-        if (additions.length === 1 && additionPage > 0) {
-          setAdditionPage((current) => current - 1);
-          return;
-        }
-      });
-      if (!(additions.length === 1 && additionPage > 0)) await load();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+  const categoryNameOf = (categoryId) =>
+    (debt.categories || []).find((line) => String(line.id || '') === String(categoryId || ''))?.label || '';
+  const payerNameOf = (participantId) =>
+    (debt.participants || []).find((item) => String(item.id) === String(participantId))?.name || '';
 
   const onDeletePayment = async (paymentId) => {
     const accepted = await confirm({
@@ -126,6 +104,9 @@ const DebtDetailPage = () => {
         <div>
           <h1 className="text-2xl font-semibold text-primary-shade">{debt.personName}</h1>
           <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-500">
+            <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700">
+              {debt.kind === 'CONTRIBUTION' ? 'Contribution' : 'Individual'}
+            </span>
             <StatusChip status={debt.status} />
             <span>{debt.dueDate ? `due ${formatDate(debt.dueDate)}` : 'No due date'}</span>
           </p>
@@ -142,7 +123,7 @@ const DebtDetailPage = () => {
       <Tabs
         value={tab}
         tabs={[
-          { id: 'additions', label: 'Added amounts' },
+          { id: 'additions', label: debt.kind === 'CONTRIBUTION' ? 'Payers' : 'Balances' },
           { id: 'payments', label: 'Payments' },
         ]}
         onChange={(id) => setSearchParams({ tab: id })}
@@ -150,41 +131,47 @@ const DebtDetailPage = () => {
       {tab === 'additions' && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg text-primary">Added amounts</h2>
-            <Link className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0" to={`/debts/${id}/additions/new`} state={{ backgroundLocation: location }}>
-              Add amount
-            </Link>
+            <h2 className="text-lg text-primary">{debt.kind === 'CONTRIBUTION' ? 'Payers' : 'Balances'}</h2>
           </div>
-          {!additions.length && <Empty label="No added amounts yet." />}
-          {additions.length > 0 && (
-            <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-neutral-0">
-              {additions.map((line) => (
-                <li key={line._id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
-                  <span>
-                    {line.label}
-                    <span className="ml-2 text-neutral-500">{formatDateTime(line.createdAt)}</span>
-                  </span>
-                  <span className="flex flex-wrap items-center gap-2">
-                    {formatPeso(line.amount)}
-                    <EditLink to={`/debts/${id}/additions/${line._id}/edit`}>Edit</EditLink>
-                    <Button variant="danger" icon={Trash2} onClick={() => onDeleteAddition(line._id)}>
-                      Delete
-                    </Button>
-                  </span>
-                </li>
-              ))}
-            </ul>
+          {debt.kind === 'CONTRIBUTION' ? (
+            <>
+              {!(debt.participants || []).length && <Empty label="No payers yet." />}
+              {(debt.participants || []).length > 0 && (
+                <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-neutral-0">
+                  {(debt.participants || []).map((payer) => (
+                    <li key={payer.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+                      <span>
+                        {payer.name}
+                        <span className="ml-2">
+                          <StatusChip status={payer.status} />
+                        </span>
+                      </span>
+                      <span>Remaining {formatPeso(payer.remainingAmount)} of {formatPeso(payer.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <>
+              {!(debt.categories || []).length && <Empty label="No balances yet." />}
+              {(debt.categories || []).length > 0 && (
+                <ul className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-neutral-0">
+                  {(debt.categories || []).map((line) => (
+                    <li key={line.id || 'original'} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+                      <span>
+                        {line.label}
+                        <span className="ml-2">
+                          <StatusChip status={line.status} />
+                        </span>
+                      </span>
+                      <span>Remaining {formatPeso(line.remainingAmount)} of {formatPeso(line.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
-          <Pager
-            page={additionPage}
-            pageSize={additionPageSize}
-            total={additionTotal}
-            label="Added amounts"
-            onPageChange={(nextPage, nextSize) => {
-              setAdditionPage(nextPage);
-              setAdditionPageSize(nextSize);
-            }}
-          />
         </div>
       )}
       {tab === 'payments' && (
@@ -202,6 +189,8 @@ const DebtDetailPage = () => {
                 <li key={payment._id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                   <span>
                     {formatPeso(payment.amount)} into {nameOf(payment.accountId)}
+                    {payerNameOf(payment.participantId) ? ` · ${payerNameOf(payment.participantId)}` : ''}
+                    {categoryNameOf(payment.categoryId) ? ` · ${categoryNameOf(payment.categoryId)}` : ''}
                     <span className="ml-2 text-neutral-500">{formatDateTime(payment.paymentDate)}</span>
                   </span>
                   <span className="flex flex-wrap items-center gap-2">

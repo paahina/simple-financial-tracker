@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useConfirm } from '../hooks/useConfirm';
 
-const FormModal = ({ dirty, closeTo, children }) => {
+const FormModal = ({ dirty, closeTo, wide = false, children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const confirm = useConfirm();
@@ -45,7 +45,7 @@ const FormModal = ({ dirty, closeTo, children }) => {
         if (event.target === event.currentTarget) requestClose();
       }}
     >
-      <div className="relative w-full max-w-lg" role="dialog" aria-modal="true">
+      <div className={`relative w-full ${wide ? 'max-w-5xl' : 'max-w-lg'}`} role="dialog" aria-modal="true">
         <button
           type="button"
           aria-label="Close"

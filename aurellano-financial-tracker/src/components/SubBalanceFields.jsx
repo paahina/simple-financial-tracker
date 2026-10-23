@@ -12,7 +12,15 @@ export const emptySubBalanceRow = (seed = {}) => ({
   amount: seed.amount || '',
 });
 
-const SubBalanceFields = ({ rows, onChange, error }) => {
+const SubBalanceFields = ({
+  rows,
+  onChange,
+  error,
+  heading = 'Sub-balances',
+  itemName = 'sub-balance',
+  owner = 'the account',
+  addLabel = 'Add sub-balance',
+}) => {
   const confirm = useConfirm();
 
   const updateRow = (key, patch) => {
@@ -21,10 +29,10 @@ const SubBalanceFields = ({ rows, onChange, error }) => {
 
   const onRemove = async (row) => {
     if (rows.length === 1) return;
-    const name = String(row.label || '').trim() || 'this sub-balance';
+    const name = String(row.label || '').trim() || `this ${itemName}`;
     const accepted = await confirm({
-      title: 'Remove sub-balance?',
-      message: `This removes ${name} from the account.`,
+      title: `Remove ${itemName}?`,
+      message: `This removes ${name} from ${owner}.`,
       confirmLabel: 'Delete',
       confirmVariant: 'danger',
       confirmIcon: Trash2,
@@ -35,7 +43,7 @@ const SubBalanceFields = ({ rows, onChange, error }) => {
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-neutral-500">Sub-balances</p>
+      <p className="text-sm text-neutral-500">{heading}</p>
       {error ? <p className="text-xs text-error-foreground">{error}</p> : null}
       {rows.map((row, index) => (
         <div key={row.key} className="grid grid-cols-[minmax(0,1fr)_minmax(5rem,8rem)_auto] items-end gap-2">
@@ -61,13 +69,13 @@ const SubBalanceFields = ({ rows, onChange, error }) => {
             className="px-2"
             icon={Trash2}
             disabled={rows.length === 1}
-            aria-label={rows.length === 1 ? 'Cannot remove the last sub-balance' : `Remove ${row.label || 'sub-balance'}`}
+            aria-label={rows.length === 1 ? `Cannot remove the last ${itemName}` : `Remove ${row.label || itemName}`}
             onClick={() => onRemove(row)}
           />
         </div>
       ))}
       <Button variant="ghost" onClick={() => onChange([...rows, emptySubBalanceRow()])}>
-        Add sub-balance
+        {addLabel}
       </Button>
     </div>
   );

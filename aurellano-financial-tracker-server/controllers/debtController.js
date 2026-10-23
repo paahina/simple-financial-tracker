@@ -8,18 +8,33 @@ const { isPaged, slicePage } = require('../utils/pagination');
 const {
   FinanceError,
   applySubBalanceDelta,
+  categoryRemaining,
   debtState,
   debtTotals,
+  effectiveDebtDueDate,
+  normalizeDebtCategories,
+  normalizeParticipants,
   owedAmount,
+  participantRemaining,
+  presentDebtCategories,
+  presentParticipants,
   requireOwnedAccount,
+  resolveCategoryId,
+  resolveParticipantId,
   resolvePocketId,
   sendFinanceError,
 } = require('../utils/finance');
 
 const presentDebt = async (debt) => {
-  const paid = await debtTotals(DebtPayment, debt._id);
+  const payments = await DebtPayment.find({ debtId: debt._id, userId: debt.userId }).select(
+    'amount categoryId participantId',
+  );
+  const paid = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
   const total = owedAmount(debt);
-  const state = debtState(total, paid, debt.dueDate);
+  const categories = presentDebtCategories(debt, payments);
+  const presentedParticipants = presentParticipants(debt, payments);
+  const dueDate = effectiveDebtDueDate(categories, debt.dueDate);
+  const state = debtState(total, paid, dueDate);
   if (debt.status !== state.status) {
     debt.status = state.status;
     await debt.save();
@@ -29,6 +44,8 @@ const presentDebt = async (debt) => {
   plain.totalAmount = total;
   plain.remainingAmount = state.remaining;
   plain.status = state.status;
+  plain.categories = categories;
+  plain.participants = presentedParticipants;
   return plain;
 };
 
@@ -173,11 +190,29 @@ const getDebtById = async (req, res) => {
 
 const createDebt = async (req, res) => {
   try {
+    const kind = req.body.kind === 'CONTRIBUTION' ? 'CONTRIBUTION' : 'INDIVIDUAL';
+    let originalAmount = Number(req.body.originalAmount);
+    let additions = [];
+    if (kind === 'INDIVIDUAL' && Array.isArray(req.body.subBalances)) {
+      additions = normalizeDebtCategories(req.body.subBalances);
+      originalAmount = 0;
+      const total = additions.reduce((sum, line) => sum + line.amount, 0);
+      if (total < 1) {
+        throw new FinanceError('Amount owed is required');
+      }
+    } else if (!Number.isInteger(originalAmount) || originalAmount < 1) {
+      throw new FinanceError('Amount owed is required');
+    }
+    const participants =
+      kind === 'CONTRIBUTION' ? normalizeParticipants(req.body.participants, originalAmount) : [];
     const debt = await Debt.create({
       userId: req.user.id,
       personName: req.body.personName,
+      kind,
       description: req.body.description || '',
-      originalAmount: Number(req.body.originalAmount),
+      originalAmount,
+      additions,
+      participants,
       dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
       status: 'PENDING',
     });
@@ -200,6 +235,36 @@ const updateDebt = async (req, res) => {
     }
     if (req.body.originalAmount !== undefined) {
       debt.originalAmount = Number(req.body.originalAmount);
+    }
+    if (Array.isArray(req.body.subBalances)) {
+      if (debt.kind === 'CONTRIBUTION') {
+        throw new FinanceError('A contribution cannot have labeled balances');
+      }
+      const next = normalizeDebtCategories(req.body.subBalances);
+      const total = next.reduce((sum, line) => sum + line.amount, 0);
+      if (total < 1) {
+        throw new FinanceError('Amount owed is required');
+      }
+      const kept = new Set(next.map((line) => line._id).filter(Boolean).map(String));
+      const removed = (debt.additions || []).filter((line) => !kept.has(String(line._id)));
+      if (removed.length) {
+        const used = await DebtPayment.countDocuments({
+          debtId: debt._id,
+          userId: debt.userId,
+          categoryId: { $in: removed.map((line) => line._id) },
+        });
+        if (used) {
+          throw new FinanceError('A balance with payments cannot be removed');
+        }
+      }
+      debt.additions = next;
+      debt.originalAmount = 0;
+    }
+    if (Array.isArray(req.body.participants)) {
+      if (debt.kind !== 'CONTRIBUTION') {
+        throw new FinanceError('Only a contribution can have payers');
+      }
+      debt.participants = normalizeParticipants(req.body.participants, Number(debt.originalAmount));
     }
     const paid = await debtTotals(DebtPayment, debt._id);
     if (owedAmount(debt) < paid) {
@@ -233,6 +298,7 @@ const createAddition = async (req, res) => {
     debt.additions.push({
       label: String(req.body.label).trim(),
       amount: Number(req.body.amount),
+      dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
       createdAt: new Date(req.body.createdAt),
     });
     await assertOwedCoversPayments(debt);
@@ -248,7 +314,17 @@ const updateAddition = async (req, res) => {
     const { debt, line } = await requireAddition(req.user.id, req.params.id);
     if (req.body.label !== undefined) line.label = String(req.body.label).trim();
     if (req.body.amount !== undefined) line.amount = Number(req.body.amount);
+    if (req.body.dueDate !== undefined) line.dueDate = req.body.dueDate ? new Date(req.body.dueDate) : null;
     if (req.body.createdAt !== undefined) line.createdAt = new Date(req.body.createdAt);
+    const payments = await DebtPayment.find({ debtId: debt._id, userId: debt.userId }).select(
+      'amount categoryId',
+    );
+    const paidOnLine = payments
+      .filter((payment) => payment.categoryId && String(payment.categoryId) === String(line._id))
+      .reduce((sum, payment) => sum + Number(payment.amount), 0);
+    if (Number(line.amount) < paidOnLine) {
+      throw new FinanceError('Category amount cannot be less than recorded payments');
+    }
     await assertOwedCoversPayments(debt);
     await debt.save();
     res.status(HttpStatus.OK).json(await presentDebt(debt));
@@ -260,6 +336,14 @@ const updateAddition = async (req, res) => {
 const deleteAddition = async (req, res) => {
   try {
     const { debt, line } = await requireAddition(req.user.id, req.params.id);
+    const used = await DebtPayment.countDocuments({
+      debtId: debt._id,
+      userId: debt.userId,
+      categoryId: line._id,
+    });
+    if (used) {
+      throw new FinanceError('A category with payments cannot be removed');
+    }
     line.deleteOne();
     await assertOwedCoversPayments(debt);
     await debt.save();
@@ -311,12 +395,25 @@ const createDebtPayment = async (req, res) => {
     if (amount > remaining) {
       throw new FinanceError('Payment cannot be greater than the remaining debt');
     }
+    const categoryId = resolveCategoryId(debt, req.body.categoryId || null);
+    const participantId = resolveParticipantId(debt, req.body.participantId || null);
+    const payments = await DebtPayment.find({ debtId: debt._id, userId: debt.userId }).select(
+      'amount categoryId participantId',
+    );
+    if (amount > categoryRemaining(debt, payments, categoryId)) {
+      throw new FinanceError('Payment cannot be greater than the remaining balance');
+    }
+    if (participantId && amount > participantRemaining(debt, payments, participantId)) {
+      throw new FinanceError('Payment cannot be greater than this payer\'s remaining share');
+    }
     const subBalanceId = resolvePocketId(account, req.body.subBalanceId || null);
     await applyPaymentPocket(account, subBalanceId, amount);
     const payment = await DebtPayment.create({
       userId: req.user.id,
       debtId: debt._id,
       accountId: req.body.accountId,
+      categoryId,
+      participantId,
       subBalanceId,
       amount,
       paymentDate: new Date(req.body.paymentDate),
@@ -365,6 +462,23 @@ const updateDebtPayment = async (req, res) => {
     if (nextAmount > remainingWithoutThis) {
       throw new FinanceError('Payment cannot be greater than the remaining debt');
     }
+    const requestedCategory =
+      req.body.categoryId !== undefined ? req.body.categoryId || null : payment.categoryId;
+    const nextCategoryId = resolveCategoryId(debt, requestedCategory);
+    const requestedParticipant =
+      req.body.participantId !== undefined ? req.body.participantId || null : payment.participantId;
+    const nextParticipantId = resolveParticipantId(debt, requestedParticipant);
+    const others = await DebtPayment.find({
+      debtId: debt._id,
+      userId: debt.userId,
+      _id: { $ne: payment._id },
+    }).select('amount categoryId participantId');
+    if (nextAmount > categoryRemaining(debt, others, nextCategoryId)) {
+      throw new FinanceError('Payment cannot be greater than the remaining balance');
+    }
+    if (nextParticipantId && nextAmount > participantRemaining(debt, others, nextParticipantId)) {
+      throw new FinanceError('Payment cannot be greater than this payer\'s remaining share');
+    }
     const requestedPocket =
       req.body.subBalanceId !== undefined
         ? req.body.subBalanceId || null
@@ -377,6 +491,8 @@ const updateDebtPayment = async (req, res) => {
     if (req.body.amount !== undefined) payment.amount = nextAmount;
     if (req.body.paymentDate !== undefined) payment.paymentDate = new Date(req.body.paymentDate);
     if (req.body.notes !== undefined) payment.notes = req.body.notes;
+    payment.categoryId = nextCategoryId;
+    payment.participantId = nextParticipantId;
     payment.subBalanceId = nextPocketId;
     if (req.body.recordAsIncome === true) {
       const fields = requireIncomeFields(req.body);

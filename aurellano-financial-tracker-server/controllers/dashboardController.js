@@ -4,12 +4,16 @@ const Transfer = require('../models/transferModel');
 const Debt = require('../models/debtModel');
 const DebtPayment = require('../models/debtPaymentModel');
 const { HttpStatus } = require('../config/constants');
-const { balanceForAccount, debtState, debtTotals, monthRange, owedAmount, sumAmount, sendFinanceError } =
-  require('../utils/finance');
+const {
+  balanceForAccount,
+  debtState,
+  debtTotals,
+  monthRange,
+  owedAmount,
+  sumAmount,
+  sendFinanceError,
+} = require('../utils/finance');
 const { slicePage } = require('../utils/pagination');
-
-const spendableBalance = (balance, remainingBalance) =>
-  remainingBalance == null ? balance : Math.max(0, balance - remainingBalance);
 
 const getDashboard = async (req, res) => {
   try {
@@ -26,14 +30,10 @@ const getDashboard = async (req, res) => {
           type: account.type,
           currency: account.currency,
           balance,
-          spendable: spendableBalance(balance, account.remainingBalance),
         };
       }),
     );
-    const totalMoney = accountBalances.reduce((sum, account) => sum + account.spendable, 0);
-    accountBalances.forEach((account) => {
-      delete account.spendable;
-    });
+    const totalMoney = accountBalances.reduce((sum, account) => sum + account.balance, 0);
     const accountPage = slicePage(accountBalances, req.query, 'accountPage', 'accountLimit');
     const [monthlyIncome, monthlyExpenses, debts] = await Promise.all([
       sumAmount(Transaction, {
@@ -57,6 +57,7 @@ const getDashboard = async (req, res) => {
     }
 
     res.status(HttpStatus.OK).json({
+      totalBalance: totalMoney,
       totalMoney,
       monthlyIncome,
       monthlyExpenses,

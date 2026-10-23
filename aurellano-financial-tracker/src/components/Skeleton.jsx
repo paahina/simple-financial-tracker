@@ -82,7 +82,7 @@ const EntryListSkeleton = () => (
 const DashboardSummarySkeleton = () => (
   <>
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 5 }, (_, index) => (
+      {Array.from({ length: 7 }, (_, index) => (
         <CardSkeleton key={index} />
       ))}
     </div>

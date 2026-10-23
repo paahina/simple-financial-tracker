@@ -106,6 +106,9 @@ const DebtsPage = () => {
           <li key={debt._id} className="flex flex-col rounded-lg border border-neutral-200 bg-neutral-0 p-4 text-sm">
             <p className="font-medium">{debt.personName}</p>
             <p className="flex flex-wrap items-center gap-2 text-neutral-500">
+              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs">
+                {debt.kind === 'CONTRIBUTION' ? 'Contribution' : 'Individual'}
+              </span>
               <StatusChip status={debt.status} />
               <span>{debt.dueDate ? `due ${formatDate(debt.dueDate)}` : 'No due date'}</span>
             </p>

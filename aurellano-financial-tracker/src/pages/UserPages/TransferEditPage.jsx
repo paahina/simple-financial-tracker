@@ -4,13 +4,21 @@ import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
-import { ErrorText, Loading } from '../../components/StatusMessage';
+import { Empty, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import SubBalanceSelect from '../../components/SubBalanceSelect';
 import { getAccountsRequest, getTransferRequest, updateTransferRequest } from '../../services/api';
-import { accountById, accountOption, pocketIdForAccount, pocketOptions, selectableAccounts } from '../../utils/accounts';
+import {
+  accountById,
+  accountLabelWithBalance,
+  accountOption,
+  pocketIdForAccount,
+  pocketOptions,
+  selectableAccounts,
+} from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
@@ -24,6 +32,7 @@ const TransferEditPage = () => {
   const [accounts, setAccounts] = useState([]);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  useFormErrorToast(error);
 
   useEffect(() => {
     let active = true;
@@ -115,13 +124,18 @@ const TransferEditPage = () => {
 
   return (
     <FormModal dirty={dirty} closeTo="/transfers">
-      {error && !form && <ErrorText message={error} />}
+      {error && !form && <Empty label="Couldn't load this form." />}
       {!form && !error && <Loading variant="form" />}
       {form && (
     <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
       <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit transfer</h1>
-      <ErrorText message={error} />
-      <Field label="From" error={fieldErrors.fromAccountId}>
+      <Field
+        label={accountLabelWithBalance(
+          'From',
+          form.fromAccountId !== 'other' ? accountById(accounts, form.fromAccountId) : null,
+        )}
+        error={fieldErrors.fromAccountId}
+      >
         <Select
           value={form.fromAccountId}
           options={[
@@ -155,7 +169,13 @@ const TransferEditPage = () => {
           />
         </Field>
       )}
-      <Field label="To" error={fieldErrors.toAccountId}>
+      <Field
+        label={accountLabelWithBalance(
+          'To',
+          form.toAccountId !== 'other' ? accountById(accounts, form.toAccountId) : null,
+        )}
+        error={fieldErrors.toAccountId}
+      >
         <Select
           value={form.toAccountId}
           options={[

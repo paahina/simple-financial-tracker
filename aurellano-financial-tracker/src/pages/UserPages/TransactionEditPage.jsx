@@ -6,8 +6,9 @@ import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
 import { transactionTypeOptions } from '../../components/TransactionTypeChip';
 import FormModal from '../../components/FormModal';
-import { ErrorText, Loading } from '../../components/StatusMessage';
+import { Empty, Loading } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { useToast } from '../../hooks/useToast';
 import {
@@ -17,7 +18,14 @@ import {
   updateTransactionRequest,
 } from '../../services/api';
 import SubBalanceSelect from '../../components/SubBalanceSelect';
-import { accountById, accountOption, pocketIdForAccount, pocketOptions, selectableAccounts } from '../../utils/accounts';
+import {
+  accountById,
+  accountLabelWithBalance,
+  accountOption,
+  pocketIdForAccount,
+  pocketOptions,
+  selectableAccounts,
+} from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
@@ -70,6 +78,7 @@ const TransactionEditPage = () => {
   const categories = categoriesQuery.data || [];
   const matchingCategories = categories.filter((category) => category.type === form?.type);
   const loadError = error || accountsQuery.error?.message || categoriesQuery.error?.message || '';
+  useFormErrorToast(loadError);
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -111,13 +120,12 @@ const TransactionEditPage = () => {
 
   return (
     <FormModal dirty={dirty} closeTo="/transactions">
-      {loadError && !form && <ErrorText message={loadError} />}
+      {loadError && !form && <Empty label="Couldn't load this form." />}
       {!form && !loadError && <Loading variant="form" />}
       {form && (
     <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
       <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit transaction</h1>
-      <ErrorText message={loadError} />
-      <Field label="Account" error={fieldErrors.accountId}>
+      <Field label={accountLabelWithBalance('Account', accountById(accounts, form.accountId))} error={fieldErrors.accountId}>
         <Select
           value={form.accountId}
           options={accounts.map(accountOption)}

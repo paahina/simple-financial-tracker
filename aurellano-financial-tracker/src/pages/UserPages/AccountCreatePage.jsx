@@ -6,8 +6,8 @@ import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import Select from '../../components/Select';
 import FormModal from '../../components/FormModal';
-import { ErrorText } from '../../components/StatusMessage';
 import { useAuth } from '../../hooks/useAuth';
+import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import SubBalanceFields, { emptySubBalanceRow } from '../../components/SubBalanceFields';
@@ -38,6 +38,7 @@ const AccountCreatePage = () => {
   const [baseline] = useState(JSON.stringify(emptyForm));
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  useFormErrorToast(error);
   const total = labeledSubBalances(form.subBalances).reduce((sum, item) => sum + item.amount, 0);
 
   const onSubmit = async (event) => {
@@ -83,7 +84,6 @@ const AccountCreatePage = () => {
     <FormModal dirty={dirty} closeTo="/accounts">
       <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
         <h1 className="pr-8 text-2xl font-semibold text-primary-shade">New account</h1>
-        <ErrorText message={error} />
         <Field label="Name" error={fieldErrors.name}>
           <input
             className={inputClass}

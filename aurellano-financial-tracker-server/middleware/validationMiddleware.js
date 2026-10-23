@@ -153,9 +153,16 @@ const transferUpdateValidation = [
 
 const debtValidation = [
   body('personName').isString().trim().isLength({ min: 2, max: 100 }),
+  body('kind').optional().isIn(['INDIVIDUAL', 'CONTRIBUTION']),
   body('description').optional().isString().trim(),
-  body('originalAmount').isInt({ min: 1 }),
+  body('originalAmount').optional().isInt({ min: 1 }),
   body('dueDate').optional({ values: 'falsy' }).isISO8601(),
+  body('subBalances').optional().isArray(),
+  body('subBalances.*.label').optional().isString().trim().isLength({ min: 1, max: 100 }),
+  body('subBalances.*.amount').optional().isInt({ min: 0 }),
+  body('participants').optional().isArray(),
+  body('participants.*.name').optional().isString().trim().isLength({ min: 1, max: 100 }),
+  body('participants.*.amount').optional().isInt({ min: 1 }),
   handleValidation,
 ];
 
@@ -164,6 +171,12 @@ const debtUpdateValidation = [
   body('description').optional().isString().trim(),
   body('originalAmount').optional().isInt({ min: 1 }),
   body('dueDate').optional({ values: 'falsy' }).isISO8601(),
+  body('subBalances').optional().isArray(),
+  body('subBalances.*.label').optional().isString().trim().isLength({ min: 1, max: 100 }),
+  body('subBalances.*.amount').optional().isInt({ min: 0 }),
+  body('participants').optional().isArray(),
+  body('participants.*.name').optional().isString().trim().isLength({ min: 1, max: 100 }),
+  body('participants.*.amount').optional().isInt({ min: 1 }),
   handleValidation,
 ];
 
@@ -172,6 +185,7 @@ const debtAdditionValidation = [
   body('label').isString().trim().isLength({ min: 1, max: 100 }),
   body('amount').isInt({ min: 1 }),
   body('createdAt').isISO8601(),
+  body('dueDate').optional({ values: 'falsy' }).isISO8601(),
   handleValidation,
 ];
 
@@ -179,6 +193,7 @@ const debtAdditionUpdateValidation = [
   body('label').optional().isString().trim().isLength({ min: 1, max: 100 }),
   body('amount').optional().isInt({ min: 1 }),
   body('createdAt').optional().isISO8601(),
+  body('dueDate').optional({ values: 'falsy' }).isISO8601(),
   handleValidation,
 ];
 
@@ -192,6 +207,8 @@ const debtPaymentValidation = [
   body('incomeLabel').optional().isString().trim().isLength({ min: 1, max: 100 }),
   body('incomeCategoryId').optional().isMongoId(),
   body('subBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
+  body('categoryId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
+  body('participantId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
   handleValidation,
 ];
 
@@ -203,6 +220,23 @@ const debtPaymentUpdateValidation = [
   body('recordAsIncome').optional().isBoolean(),
   body('incomeLabel').optional().isString().trim().isLength({ min: 1, max: 100 }),
   body('incomeCategoryId').optional().isMongoId(),
+  body('subBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
+  body('categoryId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
+  body('participantId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
+  handleValidation,
+];
+
+const toBuyValidation = [
+  body('name').isString().trim().isLength({ min: 1, max: 100 }),
+  body('quantity').isInt({ min: 1 }).withMessage('Quantity must be a whole number of at least 1'),
+  body('unitPrice').isInt({ min: 0 }).withMessage('Estimated unit price must be a non-negative integer in centavos'),
+  body('notes').optional().isString().trim().isLength({ max: 500 }),
+  handleValidation,
+];
+
+const toBuyCompleteValidation = [
+  body('accountId').isMongoId(),
+  body('amount').isInt({ min: 1 }).withMessage('Amount must be a positive integer in centavos'),
   body('subBalanceId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
   handleValidation,
 ];
@@ -232,5 +266,7 @@ module.exports = {
   debtAdditionUpdateValidation,
   debtPaymentValidation,
   debtPaymentUpdateValidation,
+  toBuyValidation,
+  toBuyCompleteValidation,
   reportQueryValidation,
 };
