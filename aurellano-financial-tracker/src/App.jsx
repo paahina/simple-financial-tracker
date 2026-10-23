@@ -20,6 +20,7 @@ import AccountsPage from './pages/UserPages/AccountsPage';
 import CategoriesPage from './pages/UserPages/CategoriesPage';
 import CategoryFormPage from './pages/UserPages/CategoryFormPage';
 import DashboardPage from './pages/UserPages/DashboardPage';
+import DebtBalanceAddPage from './pages/UserPages/DebtBalanceAddPage';
 import DebtAdditionCreatePage from './pages/UserPages/DebtAdditionCreatePage';
 import DebtAdditionEditPage from './pages/UserPages/DebtAdditionEditPage';
 import DebtCreatePage from './pages/UserPages/DebtCreatePage';
@@ -77,6 +78,7 @@ const router = createBrowserRouter([
           { path: '/debts', element: <DebtsPage /> },
           { path: '/debts/new', element: <DebtCreatePage /> },
           { path: '/debts/:id/additions/new', element: <DebtAdditionCreatePage /> },
+          { path: '/debts/:id/balances/add', element: <DebtBalanceAddPage /> },
           { path: '/debts/:id/additions/:additionId/edit', element: <DebtAdditionEditPage /> },
           { path: '/debts/:id/payments/new', element: <DebtPaymentCreatePage /> },
           { path: '/debts/:id/edit', element: <DebtEditPage /> },

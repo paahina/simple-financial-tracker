@@ -180,6 +180,13 @@ const debtUpdateValidation = [
   handleValidation,
 ];
 
+const debtAddToBalanceValidation = [
+  body('debtId').isMongoId(),
+  body('amount').isInt({ min: 1 }).withMessage('Amount must be a positive integer in centavos'),
+  body('categoryId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
+  handleValidation,
+];
+
 const debtAdditionValidation = [
   body('debtId').isMongoId(),
   body('label').isString().trim().isLength({ min: 1, max: 100 }),
@@ -264,6 +271,7 @@ module.exports = {
   debtUpdateValidation,
   debtAdditionValidation,
   debtAdditionUpdateValidation,
+  debtAddToBalanceValidation,
   debtPaymentValidation,
   debtPaymentUpdateValidation,
   toBuyValidation,

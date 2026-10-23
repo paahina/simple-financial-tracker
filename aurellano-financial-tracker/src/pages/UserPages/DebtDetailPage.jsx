@@ -132,6 +132,15 @@ const DebtDetailPage = () => {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg text-primary">{debt.kind === 'CONTRIBUTION' ? 'Payers' : 'Balances'}</h2>
+            {debt.kind === 'INDIVIDUAL' && (debt.categories || []).length > 0 ? (
+              <Link
+                className="rounded-md bg-primary-tint px-4 py-2 text-sm text-neutral-0"
+                to={`/debts/${id}/balances/add`}
+                state={{ backgroundLocation: location }}
+              >
+                Add amount
+              </Link>
+            ) : null}
           </div>
           {debt.kind === 'CONTRIBUTION' ? (
             <>

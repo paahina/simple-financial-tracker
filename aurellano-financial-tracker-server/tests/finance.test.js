@@ -633,6 +633,35 @@ test('individual debt balances split the total and a payment hits one slice', as
   assert.equal(afterCurrent.paidAmount, 0);
   assert.equal(paidRent.body.debt.remainingAmount, 8500);
   assert.ok(current.id);
+
+  const topped = await request(app).post('/api/debts/addToBalance').set(auth(token)).send({
+    debtId: created.body.debt._id,
+    categoryId: rent.id,
+    amount: 2000,
+  });
+  assert.equal(topped.status, 200);
+  const toppedRent = topped.body.categories.find((item) => item.label === 'Rent');
+  const toppedCurrent = topped.body.categories.find((item) => item.label === 'Current');
+  assert.equal(toppedRent.amount, 8000);
+  assert.equal(toppedRent.paidAmount, 1500);
+  assert.equal(toppedRent.remainingAmount, 6500);
+  assert.equal(toppedCurrent.amount, 4000);
+  assert.equal(topped.body.remainingAmount, 10500);
+
+  const contribution = await request(app).post('/api/debts/create').set(auth(token)).send({
+    personName: 'Group',
+    kind: 'CONTRIBUTION',
+    originalAmount: 1000,
+    participants: [
+      { name: 'A', amount: 500 },
+      { name: 'B', amount: 500 },
+    ],
+  });
+  const blocked = await request(app).post('/api/debts/addToBalance').set(auth(token)).send({
+    debtId: contribution.body.debt._id,
+    amount: 100,
+  });
+  assert.equal(blocked.status, 400);
 });
 
 test('to-buy complete records an expense and delete does not', async () => {

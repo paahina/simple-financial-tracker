@@ -1,5 +1,6 @@
 const express = require('express');
 const {
+  addToBalance,
   createAddition,
   createDebt,
   createDebtPayment,
@@ -16,6 +17,7 @@ const {
 const { protect } = require('../middleware/authMiddleware');
 const {
   debtAdditionUpdateValidation,
+  debtAddToBalanceValidation,
   debtAdditionValidation,
   debtPaymentUpdateValidation,
   debtPaymentValidation,
@@ -30,6 +32,7 @@ router.use(protect);
 router.get('/getAllDebts', getAllDebts);
 router.get('/getPayments/:id', mongoIdParamValidation, getDebtPayments);
 router.post('/createAddition', debtAdditionValidation, createAddition);
+router.post('/addToBalance', debtAddToBalanceValidation, addToBalance);
 router.put('/updateAddition/:id', mongoIdParamValidation, debtAdditionUpdateValidation, updateAddition);
 router.delete('/deleteAddition/:id', mongoIdParamValidation, deleteAddition);
 router.post('/createPayment', debtPaymentValidation, createDebtPayment);

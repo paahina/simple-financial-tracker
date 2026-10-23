@@ -186,6 +186,9 @@ export const updateDebtRequest = (id, payload, token) =>
 export const deleteDebtRequest = (id, token) =>
   apiRequest(`/api/debts/delete/${id}`, { method: 'DELETE', token });
 
+export const addToDebtBalanceRequest = (payload, token) =>
+  apiRequest('/api/debts/addToBalance', { method: 'POST', body: payload, token });
+
 export const createDebtAdditionRequest = (payload, token) =>
   apiRequest('/api/debts/createAddition', { method: 'POST', body: payload, token });
 

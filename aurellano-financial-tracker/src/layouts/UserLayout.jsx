@@ -41,7 +41,8 @@ const fallbackBackground = (pathname) => {
   }
   const addition =
     matchPath('/debts/:id/additions/new', pathname) ||
-    matchPath('/debts/:id/additions/:additionId/edit', pathname);
+    matchPath('/debts/:id/additions/:additionId/edit', pathname) ||
+    matchPath('/debts/:id/balances/add', pathname);
   if (addition) return asLocation(`/debts/${addition.params.id}`, '?tab=additions');
   const payment =
     matchPath('/debts/:id/payments/new', pathname) ||

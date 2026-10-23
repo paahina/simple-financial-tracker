@@ -292,6 +292,31 @@ const assertOwedCoversPayments = async (debt) => {
   }
 };
 
+const addToBalance = async (req, res) => {
+  try {
+    const debt = await requireDebt(req.user.id, req.body.debtId);
+    if (debt.kind !== 'INDIVIDUAL') {
+      throw new FinanceError('Only individual debts have balances');
+    }
+    if (!(Number(debt.originalAmount) > 0) && !(debt.additions || []).length) {
+      throw new FinanceError('No balances to add to');
+    }
+    const increment = Number(req.body.amount);
+    const categoryId = resolveCategoryId(debt, req.body.categoryId || null);
+    if (categoryId) {
+      const line = debt.additions.id(categoryId);
+      if (!line) throw new FinanceError('Balance not found', HttpStatus.NOT_FOUND);
+      line.amount = Number(line.amount) + increment;
+    } else {
+      debt.originalAmount = Number(debt.originalAmount) + increment;
+    }
+    await debt.save();
+    res.status(HttpStatus.OK).json(await presentDebt(debt));
+  } catch (error) {
+    sendFinanceError(res, error);
+  }
+};
+
 const createAddition = async (req, res) => {
   try {
     const debt = await requireDebt(req.user.id, req.body.debtId);
@@ -547,6 +572,7 @@ module.exports = {
   createDebt,
   updateDebt,
   createAddition,
+  addToBalance,
   updateAddition,
   deleteAddition,
   deleteDebt,
