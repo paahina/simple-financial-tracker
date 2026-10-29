@@ -13,12 +13,14 @@ import { afterSave, invalidateFamilies } from '../../query/cache';
 import { addToDebtBalanceRequest, getDebtRequest } from '../../services/api';
 import { categoryIdForDebt, categoryOptionValue, categoryOptions, payloadCategoryId } from '../../utils/debts';
 import { formatPeso, toCentavos } from '../../utils/format';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, requiredAmount, requiredChoice } from '../../utils/validate';
 
 const DebtBalanceAddPage = () => {
   const { id } = useParams();
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [form, setForm] = useState({ categoryId: '', amount: '' });
   const [baseline] = useState(() => JSON.stringify(form));
@@ -44,6 +46,12 @@ const DebtBalanceAddPage = () => {
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    const accepted = await confirmSave({
+      title: 'Add to balance?',
+      message: 'This increases the amount owed on the selected balance line.',
+      confirmLabel: 'Add amount',
+    });
+    if (!accepted) return;
     setActionError('');
     try {
       await afterSave(async () => {

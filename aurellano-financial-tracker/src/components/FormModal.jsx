@@ -40,7 +40,7 @@ const FormModal = ({ dirty, closeTo, wide = false, children }) => {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-neutral-900/60 px-4 py-10 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-start justify-center overflow-x-hidden overflow-y-auto bg-neutral-900/60 px-4 py-10 backdrop-blur-sm"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) requestClose();
       }}

@@ -21,9 +21,21 @@ const amountSums = (kind) => {
     };
   }
   if (kind === 'transfer') {
+    const noFromAccount = { $eq: [{ $ifNull: ['$fromAccountId', null] }, null] };
+    const hasFromAccount = { $ne: [{ $ifNull: ['$fromAccountId', null] }, null] };
+    const noToAccount = { $eq: [{ $ifNull: ['$toAccountId', null] }, null] };
+    const hasToAccount = { $ne: [{ $ifNull: ['$toAccountId', null] }, null] };
     return {
-      addedAmount: { $sum: { $cond: [{ $ifNull: ['$toAccountId', false] }, '$amount', 0] } },
-      deductedAmount: { $sum: { $cond: [{ $ifNull: ['$fromAccountId', false] }, '$amount', 0] } },
+      addedAmount: {
+        $sum: {
+          $cond: [{ $and: [noFromAccount, hasToAccount] }, '$amount', 0],
+        },
+      },
+      deductedAmount: {
+        $sum: {
+          $cond: [{ $and: [hasFromAccount, noToAccount] }, '$amount', 0],
+        },
+      },
     };
   }
   return {

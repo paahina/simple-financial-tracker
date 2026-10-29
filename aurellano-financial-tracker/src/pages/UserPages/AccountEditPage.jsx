@@ -17,6 +17,7 @@ import SubBalanceFields, { emptySubBalanceRow } from '../../components/SubBalanc
 import { deleteAccountRequest, getAccountRequest, updateAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
 import { fromCentavos, toCentavos } from '../../utils/format';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, optionalAmount, requiredText } from '../../utils/validate';
 
 const remainingCentavos = (value) => (value === '' || value == null ? null : toCentavos(value));
@@ -26,6 +27,7 @@ const AccountEditPage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
   const confirm = useConfirm();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
   const [baseline, setBaseline] = useState('');
@@ -84,6 +86,11 @@ const AccountEditPage = () => {
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    const accepted = await confirmSave({
+      title: 'Save account?',
+      message: 'This updates the account and sub-balances.',
+    });
+    if (!accepted) return;
     setError('');
     try {
       await afterSave(async () => {

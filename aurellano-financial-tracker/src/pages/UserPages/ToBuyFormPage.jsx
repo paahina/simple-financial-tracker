@@ -10,6 +10,7 @@ import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { createToBuyRequest, getToBuyItemRequest, updateToBuyRequest } from '../../services/api';
 import { formatPeso, fromCentavos, toCentavos } from '../../utils/format';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, optionalAmount, requiredText } from '../../utils/validate';
 
 const emptyForm = { name: '', quantity: '1', unitPrice: '', notes: '' };
@@ -26,6 +27,7 @@ const ToBuyFormPage = () => {
   const editing = Boolean(id);
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [form, setForm] = useState(editing ? null : emptyForm);
   const [baseline, setBaseline] = useState(editing ? '' : JSON.stringify(emptyForm));
@@ -70,6 +72,12 @@ const ToBuyFormPage = () => {
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    const accepted = await confirmSave({
+      title: editing ? 'Save item?' : 'Add item?',
+      message: editing ? 'This updates the to-buy list item.' : 'This adds the item to your to-buy list.',
+      confirmLabel: editing ? 'Save changes' : 'Add item',
+    });
+    if (!accepted) return;
     setError('');
     const payload = {
       name: form.name.trim(),

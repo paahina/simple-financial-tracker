@@ -224,17 +224,11 @@ const assertTransferTargets = (fromAccount, fromSubId, toAccount, toSubId) => {
 const balanceForAccount = async (account, models) => {
   const accountId = account._id;
   const userId = account.userId;
-  const [income, expenses, transfersIn, transfersOut, debtPayments] =
-    await Promise.all([
+  const [income, expenses, transfersIn, transfersOut] = await Promise.all([
       sumAmount(models.Transaction, { userId, accountId, type: 'INCOME' }),
       sumAmount(models.Transaction, { userId, accountId, type: 'EXPENSE' }),
       sumAmount(models.Transfer, { userId, toAccountId: accountId }),
       sumAmount(models.Transfer, { userId, fromAccountId: accountId }),
-      sumAmount(models.DebtPayment, {
-        userId,
-        accountId,
-        $or: [{ transactionId: { $exists: false } }, { transactionId: null }],
-      }),
     ]);
 
   return (
@@ -243,8 +237,27 @@ const balanceForAccount = async (account, models) => {
     expenses +
     transfersIn -
     transfersOut +
-    debtPayments
+    (await debtPaymentNetForAccount(models.DebtPayment, models.Debt, userId, accountId))
   );
+};
+
+const debtPaymentNetForAccount = async (DebtPayment, Debt, userId, accountId) => {
+  const payments = await DebtPayment.find({
+    userId,
+    accountId,
+    $or: [{ transactionId: null }, { transactionId: { $exists: false } }],
+  }).select('amount debtId');
+  if (!payments.length) return 0;
+  const debtIds = [...new Set(payments.map((payment) => String(payment.debtId)))];
+  const debts = await Debt.find({ _id: { $in: debtIds }, userId }).select('direction');
+  const directionByDebt = new Map(
+    debts.map((debt) => [String(debt._id), debt.direction === 'PAYABLE' ? 'PAYABLE' : 'RECEIVABLE']),
+  );
+  return payments.reduce((sum, payment) => {
+    const direction = directionByDebt.get(String(payment.debtId)) || 'RECEIVABLE';
+    const amount = Number(payment.amount);
+    return sum + (direction === 'PAYABLE' ? -amount : amount);
+  }, 0);
 };
 
 const debtTotals = async (DebtPayment, debtId) =>

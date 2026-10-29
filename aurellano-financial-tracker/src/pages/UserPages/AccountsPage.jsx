@@ -15,7 +15,6 @@ import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { deactivateAccountRequest, getAccountsRequest, reactivateAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
-import { formatPeso } from '../../utils/format';
 
 const emptyCounts = { active: 0, deactivated: 0 };
 
@@ -123,7 +122,7 @@ const AccountsPage = () => {
               <ul className="mt-2 space-y-1 text-sm text-neutral-500">
                 {account.subBalances.map((item) => (
                   <li key={item._id}>
-                    {item.label}: {formatPeso(item.amount)}
+                    {item.label}: <Money centavos={item.amount} />
                   </li>
                 ))}
               </ul>

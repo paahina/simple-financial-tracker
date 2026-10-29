@@ -1,17 +1,7 @@
 import Pager from './Pager';
+import DayAmountSummary from './DayAmountSummary';
 import { Empty, Loading } from './StatusMessage';
-import { formatDayKey, formatPeso } from '../utils/format';
-
-const AmountChip = ({ tone, amount }) => (
-  <span
-    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-      tone === 'added' ? 'bg-success-tint text-success' : 'bg-destructive-tint text-destructive-shade'
-    }`}
-  >
-    {tone === 'added' ? '+' : '-'}
-    {formatPeso(amount)}
-  </span>
-);
+import { formatDayKey } from '../utils/format';
 
 const DayGroupList = ({
   days,
@@ -45,8 +35,7 @@ const DayGroupList = ({
                   {day.count} {day.count === 1 ? 'entry' : 'entries'}
                 </span>
                 <span className="flex flex-wrap gap-1">
-                  {day.addedAmount > 0 ? <AmountChip tone="added" amount={day.addedAmount} /> : null}
-                  {day.deductedAmount > 0 ? <AmountChip tone="deducted" amount={day.deductedAmount} /> : null}
+                  <DayAmountSummary addedAmount={day.addedAmount} deductedAmount={day.deductedAmount} />
                 </span>
               </button>
             </li>

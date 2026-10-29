@@ -10,6 +10,12 @@ const debtSchema = new mongoose.Schema(
       enum: ['INDIVIDUAL', 'CONTRIBUTION'],
       default: 'INDIVIDUAL',
     },
+    direction: {
+      type: String,
+      required: true,
+      enum: ['RECEIVABLE', 'PAYABLE'],
+      default: 'RECEIVABLE',
+    },
     categoryLabel: { type: String, trim: true, maxlength: 100, default: '' },
     description: { type: String, trim: true, default: '' },
     originalAmount: { type: Number, required: true, min: 0 },
@@ -39,5 +45,6 @@ const debtSchema = new mongoose.Schema(
 );
 
 debtSchema.index({ userId: 1, status: 1 });
+debtSchema.index({ userId: 1, direction: 1, status: 1 });
 
 module.exports = mongoose.model('Debt', debtSchema);

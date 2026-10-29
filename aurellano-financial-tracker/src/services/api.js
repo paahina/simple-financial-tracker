@@ -171,8 +171,8 @@ export const updateTransferRequest = (id, payload, token) =>
 export const deleteTransferRequest = (id, token) =>
   apiRequest(`/api/transfers/delete/${id}`, { method: 'DELETE', token });
 
-export const getDebtsRequest = (token, { page, limit, status } = {}) =>
-  apiRequest(`/api/debts/getAllDebts${toQuery({ page, limit, status })}`, { token });
+export const getDebtsRequest = (token, { page, limit, status, direction } = {}) =>
+  apiRequest(`/api/debts/getAllDebts${toQuery({ page, limit, status, direction })}`, { token });
 
 export const getDebtRequest = (id, token, paging = {}) =>
   apiRequest(`/api/debts/get/${id}${toQuery(paging)}`, { token });

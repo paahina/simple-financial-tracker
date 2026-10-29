@@ -5,6 +5,7 @@ import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import FormModal from '../../components/FormModal';
 import Select from '../../components/Select';
+import TableSubtitleSpacer from '../../components/TableSubtitleSpacer';
 import { useAuth } from '../../hooks/useAuth';
 import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
@@ -20,6 +21,7 @@ import {
   pocketIdForAccount,
   pocketOptions,
 } from '../../utils/accounts';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const draftKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -38,6 +40,7 @@ const blankRow = (seed = {}) => ({
 const TransferCreatePage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [actionError, setActionError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
@@ -116,6 +119,15 @@ const TransferCreatePage = () => {
       setActionError(formError);
       return;
     }
+    const accepted = await confirmSave({
+      title: drafts.length === 1 ? 'Save transfer?' : 'Save transfers?',
+      message:
+        drafts.length === 1
+          ? 'This moves money between accounts or other parties.'
+          : `This records ${drafts.length} transfers.`,
+      confirmLabel: drafts.length === 1 ? 'Save' : 'Save all',
+    });
+    if (!accepted) return;
     setActionError('');
     setSaving(true);
     const pending = [...drafts];
@@ -148,7 +160,7 @@ const TransferCreatePage = () => {
 
   return (
     <FormModal dirty={dirty} closeTo="/transfers" wide>
-      <form className="space-y-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSaveAll}>
+      <form className="space-y-4 overflow-x-hidden rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSaveAll}>
         <h1 className="pr-8 text-2xl font-semibold text-primary-shade">New transfers</h1>
         <Field label="Date and time" error={dateError}>
           <input
@@ -265,7 +277,7 @@ const TransferCreatePage = () => {
             );
           })}
         </div>
-        <div className="hidden overflow-x-auto lg:block">
+        <div className="hidden lg:block lg:overflow-visible">
           <table className="min-w-full border-collapse text-sm">
             <thead>
               <tr className="bg-primary text-left text-neutral-0">
@@ -324,6 +336,7 @@ const TransferCreatePage = () => {
                       ) : null}
                       {row.fromAccountId === 'other' ? (
                         <>
+                          <TableSubtitleSpacer />
                           <input
                             className={inputClass}
                             placeholder="Sender"
@@ -379,6 +392,7 @@ const TransferCreatePage = () => {
                       ) : null}
                       {row.toAccountId === 'other' ? (
                         <>
+                          <TableSubtitleSpacer />
                           <input
                             className={inputClass}
                             placeholder="Recipient"
@@ -394,6 +408,7 @@ const TransferCreatePage = () => {
                       ) : null}
                     </td>
                     <td className="px-2 py-2">
+                      <TableSubtitleSpacer className="mb-2" />
                       <input
                         className={inputClass}
                         required
@@ -406,6 +421,7 @@ const TransferCreatePage = () => {
                       {errors.amount ? <p className="mt-1 text-xs text-error-foreground">{errors.amount}</p> : null}
                     </td>
                     <td className="px-2 py-2">
+                      <TableSubtitleSpacer className="mb-2" />
                       {drafts.length > 1 ? (
                         <Button variant="ghost" onClick={() => setDrafts(drafts.filter((item) => item.key !== row.key))}>
                           Remove

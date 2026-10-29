@@ -5,6 +5,7 @@ import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import FormModal from '../../components/FormModal';
 import Select from '../../components/Select';
+import TableSubtitleSpacer from '../../components/TableSubtitleSpacer';
 import { transactionTypeOptions } from '../../components/TransactionTypeChip';
 import { useAuth } from '../../hooks/useAuth';
 import { useFormErrorToast } from '../../hooks/useFormErrorToast';
@@ -25,6 +26,7 @@ import {
   pocketIdForAccount,
   pocketOptions,
 } from '../../utils/accounts';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const draftKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -42,6 +44,7 @@ const blankRow = (seed = {}) => ({
 const TransactionCreatePage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [actionError, setActionError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
@@ -94,6 +97,15 @@ const TransactionCreatePage = () => {
     setDateError(nextDateError);
     setFieldErrors(nextErrors);
     if (nextDateError || drafts.some((row) => hasErrors(nextErrors[row.key]))) return;
+    const accepted = await confirmSave({
+      title: drafts.length === 1 ? 'Save transaction?' : 'Save transactions?',
+      message:
+        drafts.length === 1
+          ? 'This records the entry on your account.'
+          : `This records ${drafts.length} entries on your accounts.`,
+      confirmLabel: drafts.length === 1 ? 'Save' : 'Save all',
+    });
+    if (!accepted) return;
     setActionError('');
     setSaving(true);
     const pending = [...drafts];
@@ -134,7 +146,7 @@ const TransactionCreatePage = () => {
 
   return (
     <FormModal dirty={dirty} closeTo="/transactions" wide>
-      <form className="space-y-4 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSaveAll}>
+      <form className="space-y-4 overflow-x-hidden rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSaveAll}>
         <h1 className="pr-8 text-2xl font-semibold text-primary-shade">New transactions</h1>
         <Field label="Date and time" error={dateError}>
           <input
@@ -211,7 +223,7 @@ const TransactionCreatePage = () => {
             );
           })}
         </div>
-        <div className="hidden overflow-x-auto lg:block">
+        <div className="hidden lg:block lg:overflow-visible">
           <table className="min-w-full border-collapse text-sm">
             <thead>
               <tr className="bg-primary text-left text-neutral-0">
@@ -262,10 +274,14 @@ const TransactionCreatePage = () => {
                           ) : null}
                         </>
                       ) : (
-                        <span className="text-neutral-500">—</span>
+                        <>
+                          <TableSubtitleSpacer />
+                          <span className="text-neutral-500">—</span>
+                        </>
                       )}
                     </td>
                     <td className="px-2 py-2">
+                      <TableSubtitleSpacer />
                       <Select
                         value={row.type}
                         options={transactionTypeOptions}
@@ -273,6 +289,7 @@ const TransactionCreatePage = () => {
                       />
                     </td>
                     <td className="px-2 py-2">
+                      <TableSubtitleSpacer />
                       <Select
                         value={row.categoryId}
                         options={matchingCategories.map((category) => ({ value: category._id, label: category.name }))}
@@ -281,6 +298,7 @@ const TransactionCreatePage = () => {
                       {errors.categoryId ? <p className="mt-1 text-xs text-error-foreground">{errors.categoryId}</p> : null}
                     </td>
                     <td className="px-2 py-2">
+                      <TableSubtitleSpacer />
                       <input
                         className={inputClass}
                         required
@@ -290,6 +308,7 @@ const TransactionCreatePage = () => {
                       {errors.label ? <p className="mt-1 text-xs text-error-foreground">{errors.label}</p> : null}
                     </td>
                     <td className="px-2 py-2">
+                      <TableSubtitleSpacer />
                       <input
                         className={inputClass}
                         required
@@ -302,6 +321,7 @@ const TransactionCreatePage = () => {
                       {errors.amount ? <p className="mt-1 text-xs text-error-foreground">{errors.amount}</p> : null}
                     </td>
                     <td className="px-2 py-2">
+                      <TableSubtitleSpacer />
                       {drafts.length > 1 ? (
                         <Button variant="ghost" onClick={() => setDrafts(drafts.filter((item) => item.key !== row.key))}>
                           Remove

@@ -1,3 +1,4 @@
+const Debt = require('../models/debtModel');
 const Account = require('../models/accountModel');
 const Transaction = require('../models/transactionModel');
 const Transfer = require('../models/transferModel');
@@ -17,7 +18,7 @@ const {
   syncPocketsToBalance,
 } = require('../utils/finance');
 
-const models = { Transaction, Transfer, DebtPayment };
+const models = { Transaction, Transfer, DebtPayment, Debt };
 
 const withBalance = async (account) => {
   const balance = await balanceForAccount(account, models);

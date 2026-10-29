@@ -14,12 +14,14 @@ import { afterSave, invalidateFamilies } from '../../query/cache';
 import { completeToBuyRequest, getAccountsRequest, getToBuyItemRequest } from '../../services/api';
 import { accountById, accountLabelWithBalance, pocketIdForAccount, pocketOptions } from '../../utils/accounts';
 import { formatPeso, toCentavos } from '../../utils/format';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, requiredAmount, requiredChoice } from '../../utils/validate';
 
 const ToBuyCompletePage = () => {
   const { id } = useParams();
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [form, setForm] = useState({ accountId: '', subBalanceId: '', amount: '' });
   const [baseline] = useState(() => JSON.stringify(form));
@@ -52,6 +54,12 @@ const ToBuyCompletePage = () => {
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    const accepted = await confirmSave({
+      title: 'Record expense?',
+      message: 'This creates an expense, updates your account, and removes the item from to-buy.',
+      confirmLabel: 'Record expense',
+    });
+    if (!accepted) return;
     setActionError('');
     try {
       await afterSave(async () => {

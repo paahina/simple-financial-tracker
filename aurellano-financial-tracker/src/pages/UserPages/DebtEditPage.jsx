@@ -13,6 +13,7 @@ import { afterSave, invalidateFamilies } from '../../query/cache';
 import { getDebtRequest, updateDebtRequest } from '../../services/api';
 import { applySplit, emptyPayer, payerShareSum } from '../../utils/debts';
 import { dateInput, formatPeso, fromCentavos, toCentavos, toIsoDate } from '../../utils/format';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, requiredAmount, requiredText } from '../../utils/validate';
 
 const labeledBalances = (rows) =>
@@ -28,6 +29,7 @@ const DebtEditPage = () => {
   const { id } = useParams();
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
   const [baseline, setBaseline] = useState('');
@@ -130,6 +132,11 @@ const DebtEditPage = () => {
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    const accepted = await confirmSave({
+      title: 'Save debt?',
+      message: 'This updates the debt record and balances owed.',
+    });
+    if (!accepted) return;
     setError('');
     const payload = {
       personName: form.personName,

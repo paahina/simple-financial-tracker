@@ -59,19 +59,29 @@ const requireDebt = async (userId, debtId) => {
 
 const refreshStatus = async (debt) => presentDebt(debt);
 
-const withIncome = async (userId, payments) => {
+const isPayableDebt = (debt) => debt.direction === 'PAYABLE';
+
+const paymentCashDelta = (debt, amount) =>
+  isPayableDebt(debt) ? -Number(amount) : Number(amount);
+
+const withLinkedTransactions = async (userId, payments) => {
   const ids = payments.map((payment) => payment.transactionId).filter(Boolean);
   if (!ids.length) {
     return payments.map((payment) => {
       const plain = payment.toObject ? payment.toObject() : payment;
-      return { ...plain, income: null };
+      return { ...plain, income: null, expense: null };
     });
   }
   const transactions = await Transaction.find({ _id: { $in: ids }, userId });
   const byId = new Map(transactions.map((item) => [String(item._id), item]));
   return payments.map((payment) => {
     const plain = payment.toObject ? payment.toObject() : payment;
-    return { ...plain, income: payment.transactionId ? byId.get(String(payment.transactionId)) || null : null };
+    const linked = payment.transactionId ? byId.get(String(payment.transactionId)) || null : null;
+    return {
+      ...plain,
+      income: linked?.type === 'INCOME' ? linked : null,
+      expense: linked?.type === 'EXPENSE' ? linked : null,
+    };
   });
 };
 
@@ -84,6 +94,15 @@ const requireIncomeFields = (body) => {
   return { label, categoryId };
 };
 
+const requireExpenseFields = (body) => {
+  const label = String(body.expenseLabel || '').trim();
+  const categoryId = body.expenseCategoryId;
+  if (!label || !categoryId) {
+    throw new FinanceError('Expense label and category are required');
+  }
+  return { label, categoryId };
+};
+
 const createLinkedIncome = async (userId, payment, { label, categoryId }) => {
   await requireCategory(userId, categoryId, 'INCOME');
   return Transaction.create({
@@ -91,6 +110,21 @@ const createLinkedIncome = async (userId, payment, { label, categoryId }) => {
     accountId: payment.accountId,
     subBalanceId: payment.subBalanceId,
     type: 'INCOME',
+    amount: payment.amount,
+    label,
+    categoryId,
+    description: payment.notes || '',
+    transactionDate: payment.paymentDate,
+  });
+};
+
+const createLinkedExpense = async (userId, payment, { label, categoryId }) => {
+  await requireCategory(userId, categoryId, 'EXPENSE');
+  return Transaction.create({
+    userId,
+    accountId: payment.accountId,
+    subBalanceId: payment.subBalanceId,
+    type: 'EXPENSE',
     amount: payment.amount,
     label,
     categoryId,
@@ -119,11 +153,33 @@ const syncLinkedIncome = async (userId, payment, extras = {}) => {
   await transaction.save();
 };
 
-const deleteLinkedIncome = async (userId, payment) => {
+const syncLinkedExpense = async (userId, payment, extras = {}) => {
+  if (!payment.transactionId) return;
+  const transaction = await Transaction.findOne({ _id: payment.transactionId, userId });
+  if (!transaction) {
+    payment.transactionId = null;
+    return;
+  }
+  transaction.accountId = payment.accountId;
+  transaction.subBalanceId = payment.subBalanceId;
+  transaction.amount = payment.amount;
+  transaction.transactionDate = payment.paymentDate;
+  transaction.description = payment.notes || '';
+  if (extras.label) transaction.label = extras.label;
+  if (extras.categoryId) {
+    await requireCategory(userId, extras.categoryId, 'EXPENSE');
+    transaction.categoryId = extras.categoryId;
+  }
+  await transaction.save();
+};
+
+const deleteLinkedTransaction = async (userId, payment) => {
   if (!payment.transactionId) return;
   await Transaction.deleteOne({ _id: payment.transactionId, userId });
   payment.transactionId = null;
 };
+
+const deleteLinkedIncome = async (userId, payment) => deleteLinkedTransaction(userId, payment);
 
 const emptyStatusCounts = () => ({
   PENDING: 0,
@@ -140,24 +196,32 @@ const statusCounts = (debts) => {
   return counts;
 };
 
+const debtDirection = (debt) => (debt.direction === 'PAYABLE' ? 'PAYABLE' : 'RECEIVABLE');
+
 const getAllDebts = async (req, res) => {
   try {
-    const filter = { userId: req.user.id };
-    const debts = await Debt.find(filter).sort({ dueDate: 1 });
+    const direction = req.query.direction === 'PAYABLE' ? 'PAYABLE' : 'RECEIVABLE';
+    const debts = await Debt.find({ userId: req.user.id }).sort({ dueDate: 1 });
     const presented = await Promise.all(debts.map(presentDebt));
+    const forDirection = presented.filter((debt) => debtDirection(debt) === direction);
+    const directionTotals = {
+      RECEIVABLE: presented.filter((debt) => debtDirection(debt) === 'RECEIVABLE').length,
+      PAYABLE: presented.filter((debt) => debtDirection(debt) === 'PAYABLE').length,
+    };
     if (!isPaged(req.query)) {
       const filtered = req.query.status
-        ? presented.filter((debt) => debt.status === req.query.status)
-        : presented;
+        ? forDirection.filter((debt) => debt.status === req.query.status)
+        : forDirection;
       res.status(HttpStatus.OK).json(filtered);
       return;
     }
     const filtered = req.query.status
-      ? presented.filter((debt) => debt.status === req.query.status)
-      : presented;
+      ? forDirection.filter((debt) => debt.status === req.query.status)
+      : forDirection;
     res.status(HttpStatus.OK).json({
       ...slicePage(filtered, req.query),
-      counts: statusCounts(presented),
+      counts: statusCounts(forDirection),
+      directionTotals,
     });
   } catch (error) {
     sendFinanceError(res, error);
@@ -167,7 +231,7 @@ const getAllDebts = async (req, res) => {
 const getDebtById = async (req, res) => {
   try {
     const debt = await requireDebt(req.user.id, req.params.id);
-    const payments = await withIncome(
+    const payments = await withLinkedTransactions(
       req.user.id,
       await DebtPayment.find({ debtId: debt._id, userId: req.user.id }).sort({
         paymentDate: -1,
@@ -191,6 +255,7 @@ const getDebtById = async (req, res) => {
 const createDebt = async (req, res) => {
   try {
     const kind = req.body.kind === 'CONTRIBUTION' ? 'CONTRIBUTION' : 'INDIVIDUAL';
+    const direction = req.body.direction === 'PAYABLE' ? 'PAYABLE' : 'RECEIVABLE';
     let originalAmount = Number(req.body.originalAmount);
     let additions = [];
     if (kind === 'INDIVIDUAL' && Array.isArray(req.body.subBalances)) {
@@ -209,6 +274,7 @@ const createDebt = async (req, res) => {
       userId: req.user.id,
       personName: req.body.personName,
       kind,
+      direction,
       description: req.body.description || '',
       originalAmount,
       additions,
@@ -405,9 +471,61 @@ const getDebtPayments = async (req, res) => {
   }
 };
 
-const applyPaymentPocket = async (account, subBalanceId, amount) => {
-  applySubBalanceDelta(account, subBalanceId, amount);
+const applyPaymentPocket = async (account, subBalanceId, debt, amount) => {
+  applySubBalanceDelta(account, subBalanceId, paymentCashDelta(debt, amount));
   await account.save();
+};
+
+const assertRecordAsFlags = (debt, body) => {
+  if (body.recordAsIncome === true && isPayableDebt(debt)) {
+    throw new FinanceError('Payable payments cannot be recorded as income');
+  }
+  if (body.recordAsExpense === true && !isPayableDebt(debt)) {
+    throw new FinanceError('Receivable payments cannot be recorded as expense');
+  }
+  if (body.recordAsIncome === true && body.recordAsExpense === true) {
+    throw new FinanceError('Choose either income or expense, not both');
+  }
+};
+
+const syncPaymentLinkedTransaction = async (userId, debt, payment, body) => {
+  if (isPayableDebt(debt)) {
+    if (body.recordAsExpense === true) {
+      const fields = requireExpenseFields(body);
+      if (payment.transactionId) {
+        await syncLinkedExpense(userId, payment, fields);
+      } else {
+        const expense = await createLinkedExpense(userId, payment, fields);
+        payment.transactionId = expense._id;
+      }
+      return;
+    }
+    if (body.recordAsExpense === false) {
+      await deleteLinkedTransaction(userId, payment);
+      return;
+    }
+    if (payment.transactionId) {
+      await syncLinkedExpense(userId, payment);
+    }
+    return;
+  }
+  if (body.recordAsIncome === true) {
+    const fields = requireIncomeFields(body);
+    if (payment.transactionId) {
+      await syncLinkedIncome(userId, payment, fields);
+    } else {
+      const income = await createLinkedIncome(userId, payment, fields);
+      payment.transactionId = income._id;
+    }
+    return;
+  }
+  if (body.recordAsIncome === false) {
+    await deleteLinkedTransaction(userId, payment);
+    return;
+  }
+  if (payment.transactionId) {
+    await syncLinkedIncome(userId, payment);
+  }
 };
 
 const createDebtPayment = async (req, res) => {
@@ -432,7 +550,8 @@ const createDebtPayment = async (req, res) => {
       throw new FinanceError('Payment cannot be greater than this payer\'s remaining share');
     }
     const subBalanceId = resolvePocketId(account, req.body.subBalanceId || null);
-    await applyPaymentPocket(account, subBalanceId, amount);
+    assertRecordAsFlags(debt, req.body);
+    await applyPaymentPocket(account, subBalanceId, debt, amount);
     const payment = await DebtPayment.create({
       userId: req.user.id,
       debtId: debt._id,
@@ -444,19 +563,26 @@ const createDebtPayment = async (req, res) => {
       paymentDate: new Date(req.body.paymentDate),
       notes: req.body.notes || '',
     });
-    if (req.body.recordAsIncome === true) {
-      try {
+    try {
+      if (isPayableDebt(debt)) {
+        if (req.body.recordAsExpense === true) {
+          const fields = requireExpenseFields(req.body);
+          const expense = await createLinkedExpense(req.user.id, payment, fields);
+          payment.transactionId = expense._id;
+          await payment.save();
+        }
+      } else if (req.body.recordAsIncome === true) {
         const fields = requireIncomeFields(req.body);
         const income = await createLinkedIncome(req.user.id, payment, fields);
         payment.transactionId = income._id;
         await payment.save();
-      } catch (error) {
-        await applyPaymentPocket(account, subBalanceId, -amount);
-        await payment.deleteOne();
-        throw error;
       }
+    } catch (error) {
+      await applyPaymentPocket(account, subBalanceId, debt, -amount);
+      await payment.deleteOne();
+      throw error;
     }
-    const [presented] = await withIncome(req.user.id, [payment]);
+    const [presented] = await withLinkedTransactions(req.user.id, [payment]);
     res.status(HttpStatus.CREATED).json({
       message: 'Debt payment recorded',
       payment: presented,
@@ -519,25 +645,29 @@ const updateDebtPayment = async (req, res) => {
     payment.categoryId = nextCategoryId;
     payment.participantId = nextParticipantId;
     payment.subBalanceId = nextPocketId;
-    if (req.body.recordAsIncome === true) {
-      const fields = requireIncomeFields(req.body);
-      if (payment.transactionId) {
-        await syncLinkedIncome(req.user.id, payment, fields);
+    assertRecordAsFlags(debt, req.body);
+    if (
+      req.body.recordAsIncome !== undefined ||
+      req.body.recordAsExpense !== undefined ||
+      req.body.incomeLabel !== undefined ||
+      req.body.incomeCategoryId !== undefined ||
+      req.body.expenseLabel !== undefined ||
+      req.body.expenseCategoryId !== undefined
+    ) {
+      await syncPaymentLinkedTransaction(req.user.id, debt, payment, req.body);
+    } else if (payment.transactionId) {
+      if (isPayableDebt(debt)) {
+        await syncLinkedExpense(req.user.id, payment);
       } else {
-        const income = await createLinkedIncome(req.user.id, payment, fields);
-        payment.transactionId = income._id;
+        await syncLinkedIncome(req.user.id, payment);
       }
-    } else if (req.body.recordAsIncome === false) {
-      await deleteLinkedIncome(req.user.id, payment);
-    } else {
-      await syncLinkedIncome(req.user.id, payment);
     }
     await payment.save();
-    applySubBalanceDelta(oldAccount, oldPocketId, -oldAmount);
+    applySubBalanceDelta(oldAccount, oldPocketId, -paymentCashDelta(debt, oldAmount));
     if (!sameAccount) await oldAccount.save();
-    applySubBalanceDelta(nextAccount, nextPocketId, nextAmount);
+    applySubBalanceDelta(nextAccount, nextPocketId, paymentCashDelta(debt, nextAmount));
     await nextAccount.save();
-    const [presented] = await withIncome(req.user.id, [payment]);
+    const [presented] = await withLinkedTransactions(req.user.id, [payment]);
     res.status(HttpStatus.OK).json({ payment: presented, debt: await refreshStatus(debt) });
   } catch (error) {
     sendFinanceError(res, error);
@@ -550,13 +680,13 @@ const deleteDebtPayment = async (req, res) => {
     if (!payment) {
       return res.status(HttpStatus.NOT_FOUND).json({ message: 'Debt payment not found' });
     }
+    const debt = await requireDebt(req.user.id, payment.debtId);
     const account = await requireOwnedAccount(Account, req.user.id, payment.accountId);
     const pocketId = resolvePocketId(account, payment.subBalanceId);
-    applySubBalanceDelta(account, pocketId, -Number(payment.amount));
+    applySubBalanceDelta(account, pocketId, -paymentCashDelta(debt, payment.amount));
     await account.save();
-    await deleteLinkedIncome(req.user.id, payment);
+    await deleteLinkedTransaction(req.user.id, payment);
     await payment.deleteOne();
-    const debt = await requireDebt(req.user.id, payment.debtId);
     res.status(HttpStatus.OK).json({
       message: 'Debt payment deleted',
       debt: await refreshStatus(debt),

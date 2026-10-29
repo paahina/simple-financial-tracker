@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Field, { inputClass } from '../../components/Field';
 import PayerFields from '../../components/PayerFields';
@@ -13,6 +13,7 @@ import { afterSave, invalidateFamilies } from '../../query/cache';
 import { createDebtRequest } from '../../services/api';
 import { applySplit, debtKindOptions, emptyPayer, payerShareSum } from '../../utils/debts';
 import { formatPeso, fromCentavos, toCentavos, toIsoDate } from '../../utils/format';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, requiredAmount, requiredText } from '../../utils/validate';
 
 const labeledBalances = (rows) =>
@@ -33,7 +34,11 @@ const emptyForm = {
 const DebtCreatePage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const payable = searchParams.get('direction') === 'payable';
+  const debtsListTo = payable ? '/debts?direction=payable' : '/debts';
   const [form, setForm] = useState(emptyForm);
   const [baseline] = useState(JSON.stringify(emptyForm));
   const [error, setError] = useState('');
@@ -97,6 +102,12 @@ const DebtCreatePage = () => {
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    const accepted = await confirmSave({
+      title: 'Save debt?',
+      message: 'This records what is owed and tracks payments separately from cash.',
+      confirmLabel: 'Save debt',
+    });
+    if (!accepted) return;
     setError('');
     try {
       await afterSave(async () => {
@@ -104,6 +115,7 @@ const DebtCreatePage = () => {
           {
             personName: form.personName,
             kind: form.kind,
+            direction: payable ? 'PAYABLE' : 'RECEIVABLE',
             ...(form.dueDate ? { dueDate: toIsoDate(form.dueDate) } : {}),
             description: form.description.trim(),
             ...(form.kind === 'CONTRIBUTION'
@@ -118,7 +130,7 @@ const DebtCreatePage = () => {
           },
           token,
         );
-        navigate('/debts');
+        navigate(debtsListTo);
         invalidateFamilies('debts', 'dashboard');
         notify('Debt saved');
       });
@@ -130,9 +142,11 @@ const DebtCreatePage = () => {
   const dirty = JSON.stringify(form) !== baseline;
 
   return (
-    <FormModal dirty={dirty} closeTo="/debts">
+    <FormModal dirty={dirty} closeTo={debtsListTo}>
       <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
-        <h1 className="pr-8 text-2xl font-semibold text-primary-shade">New debt</h1>
+        <h1 className="pr-8 text-2xl font-semibold text-primary-shade">
+          {payable ? 'New payable' : 'New receivable'}
+        </h1>
         <Field label="Type">
           <Select value={form.kind} options={debtKindOptions} onChange={setKind} />
         </Field>

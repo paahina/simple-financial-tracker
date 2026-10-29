@@ -10,12 +10,14 @@ import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { getDebtRequest, updateDebtAdditionRequest } from '../../services/api';
 import { dateInput, datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos, toIsoDate } from '../../utils/format';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const DebtAdditionEditPage = () => {
   const { id, additionId } = useParams();
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
   const [baseline, setBaseline] = useState('');
@@ -60,6 +62,11 @@ const DebtAdditionEditPage = () => {
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    const accepted = await confirmSave({
+      title: 'Save category?',
+      message: 'This updates the balance line on the debt.',
+    });
+    if (!accepted) return;
     setError('');
     try {
       await afterSave(async () => {

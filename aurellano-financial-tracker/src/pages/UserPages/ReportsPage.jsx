@@ -3,6 +3,7 @@ import { BarChart } from '@mui/x-charts/BarChart';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Field, { inputClass } from '../../components/Field';
+import Select from '../../components/Select';
 import Tabs from '../../components/Tabs';
 import PagedGrid from '../../components/PagedGrid';
 import Pager from '../../components/Pager';
@@ -14,6 +15,20 @@ import { formatDate, formatPeso } from '../../utils/format';
 
 const now = new Date();
 const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthOptions = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+].map((label, index) => ({ value: String(index + 1), label }));
 
 const pesoFromChart = (value) => formatPeso(Math.round((Number(value) || 0) * 100));
 
@@ -70,14 +85,15 @@ const ReportsPage = () => {
   const expenseLoading = monthlyQuery.isFetching;
 
   const onYearChange = (event) => {
-    setYear(event.target.value);
+    const next = event.target.value.replace(/\D/g, '').slice(0, 4);
+    setYear(next);
     setExpenseModel((model) => ({ ...model, page: 0 }));
     setIncomePage((model) => ({ ...model, page: 0 }));
     setExpenseCategoryPage((model) => ({ ...model, page: 0 }));
   };
 
-  const onMonthChange = (event) => {
-    setMonth(event.target.value);
+  const onMonthChange = (nextMonth) => {
+    setMonth(nextMonth);
     setExpenseModel((model) => ({ ...model, page: 0 }));
     setIncomePage((model) => ({ ...model, page: 0 }));
     setExpenseCategoryPage((model) => ({ ...model, page: 0 }));
@@ -88,12 +104,21 @@ const ReportsPage = () => {
   return (
     <section className="space-y-6">
       <h1 className="text-2xl font-semibold text-primary-shade">Reports</h1>
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <Field label="Year">
-          <input className={inputClass} type="number" value={year} onChange={onYearChange} />
+          <input
+            className={inputClass}
+            type="number"
+            inputMode="numeric"
+            min="2000"
+            max="2100"
+            step="1"
+            value={year}
+            onChange={onYearChange}
+          />
         </Field>
         <Field label="Month">
-          <input className={inputClass} type="number" min="1" max="12" value={month} onChange={onMonthChange} />
+          <Select value={month} options={monthOptions} onChange={onMonthChange} />
         </Field>
       </div>
       <Tabs

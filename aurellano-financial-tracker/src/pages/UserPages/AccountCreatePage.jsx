@@ -14,6 +14,7 @@ import SubBalanceFields, { emptySubBalanceRow } from '../../components/SubBalanc
 import { createAccountRequest } from '../../services/api';
 import { belowRemainingBalance } from '../../utils/accounts';
 import { fromCentavos, toCentavos } from '../../utils/format';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, optionalAmount, requiredText } from '../../utils/validate';
 
 const remainingCentavos = (value) => (value === '' || value == null ? null : toCentavos(value));
@@ -33,6 +34,7 @@ const labeledSubBalances = (rows) =>
 const AccountCreatePage = () => {
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [form, setForm] = useState(emptyForm);
   const [baseline] = useState(JSON.stringify(emptyForm));
@@ -55,6 +57,12 @@ const AccountCreatePage = () => {
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    const accepted = await confirmSave({
+      title: 'Save account?',
+      message: 'This creates the account and starting balances.',
+      confirmLabel: 'Save account',
+    });
+    if (!accepted) return;
     setError('');
     try {
       await afterSave(async () => {

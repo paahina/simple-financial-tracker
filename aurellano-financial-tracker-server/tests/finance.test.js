@@ -216,8 +216,8 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
     .set(auth(token));
   assert.equal(transferDays.status, 200);
   assert.equal(transferDays.body.data[0].count, 1);
-  assert.equal(transferDays.body.data[0].addedAmount, 200000);
-  assert.equal(transferDays.body.data[0].deductedAmount, 200000);
+  assert.equal(transferDays.body.data[0].addedAmount, 0);
+  assert.equal(transferDays.body.data[0].deductedAmount, 0);
 
   const badZone = await request(app)
     .get('/api/transactions/days?timezone=Not/AZone')
@@ -664,6 +664,83 @@ test('individual debt balances split the total and a payment hits one slice', as
   assert.equal(blocked.status, 400);
 });
 
+test('payable debts list separately and payments reduce account balance', async () => {
+  const token = await register('payable-debt@example.com');
+  const cash = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Cash',
+    type: 'CASH',
+    initialBalance: 100000,
+  });
+  assert.equal(cash.status, 201);
+  const pocket = cash.body.account.subBalances[0]._id;
+
+  const receivable = await request(app).post('/api/debts/create').set(auth(token)).send({
+    personName: 'Friend',
+    originalAmount: 8000,
+  });
+  assert.equal(receivable.status, 201);
+  assert.equal(receivable.body.debt.direction, 'RECEIVABLE');
+
+  const payable = await request(app).post('/api/debts/create').set(auth(token)).send({
+    personName: 'Landlord',
+    direction: 'PAYABLE',
+    originalAmount: 12000,
+  });
+  assert.equal(payable.status, 201);
+  assert.equal(payable.body.debt.direction, 'PAYABLE');
+
+  const receivableList = await request(app)
+    .get('/api/debts/getAllDebts?page=1&limit=10&direction=RECEIVABLE')
+    .set(auth(token));
+  assert.equal(receivableList.status, 200);
+  assert.equal(receivableList.body.total, 1);
+  assert.equal(receivableList.body.data[0].personName, 'Friend');
+  assert.equal(receivableList.body.directionTotals.RECEIVABLE, 1);
+  assert.equal(receivableList.body.directionTotals.PAYABLE, 1);
+
+  const payableList = await request(app)
+    .get('/api/debts/getAllDebts?page=1&limit=10&direction=PAYABLE&status=PENDING')
+    .set(auth(token));
+  assert.equal(payableList.status, 200);
+  assert.equal(payableList.body.total, 1);
+  assert.equal(payableList.body.data[0].personName, 'Landlord');
+
+  const categories = await request(app).get('/api/categories/getAllCategories').set(auth(token));
+  const food = categories.body.find((item) => item.name === 'Food');
+
+  const paid = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: payable.body.debt._id,
+    accountId: cash.body.account._id,
+    subBalanceId: pocket,
+    amount: 5000,
+    paymentDate: new Date().toISOString(),
+    recordAsExpense: true,
+    expenseLabel: 'Rent share',
+    expenseCategoryId: food._id,
+  });
+  assert.equal(paid.status, 201);
+  assert.equal(paid.body.debt.remainingAmount, 7000);
+  assert.equal(paid.body.payment.expense.label, 'Rent share');
+
+  const account = await request(app).get(`/api/accounts/get/${cash.body.account._id}`).set(auth(token));
+  assert.equal(account.body.balance, 95000);
+  assert.equal(account.body.subBalances[0].amount, 95000);
+
+  const dashboard = await request(app).get('/api/dashboard/get').set(auth(token));
+  assert.equal(dashboard.body.outstandingReceivables, 8000);
+
+  const badIncome = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: payable.body.debt._id,
+    accountId: cash.body.account._id,
+    amount: 100,
+    paymentDate: new Date().toISOString(),
+    recordAsIncome: true,
+    incomeLabel: 'Nope',
+    incomeCategoryId: food._id,
+  });
+  assert.equal(badIncome.status, 400);
+});
+
 test('to-buy complete records an expense and delete does not', async () => {
   const token = await register('tobuy@example.com');
   const cash = await request(app).post('/api/accounts/create').set(auth(token)).send({
@@ -724,4 +801,51 @@ test('to-buy complete records an expense and delete does not', async () => {
     .get(`/api/accounts/get/${cash.body.account._id}`)
     .set(auth(token));
   assert.equal(account.body.subBalances[0].amount, 22000);
+});
+
+test('transfer day totals count only external in and out', async () => {
+  const token = await register('transfer-days@example.com');
+  const today = new Date().toISOString();
+  const cash = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Cash',
+    type: 'CASH',
+    initialBalance: 100000,
+  });
+  const bank = await request(app).post('/api/accounts/create').set(auth(token)).send({
+    name: 'Bank',
+    type: 'BANK',
+    initialBalance: 0,
+  });
+  assert.equal(cash.status, 201);
+  assert.equal(bank.status, 201);
+
+  const internal = await request(app).post('/api/transfers/create').set(auth(token)).send({
+    fromAccountId: cash.body.account._id,
+    toAccountId: bank.body.account._id,
+    amount: 30000,
+    transactionDate: today,
+  });
+  assert.equal(internal.status, 201);
+
+  const fromOther = await request(app).post('/api/transfers/create').set(auth(token)).send({
+    senderName: 'Alex',
+    toAccountId: cash.body.account._id,
+    amount: 15000,
+    transactionDate: today,
+  });
+  assert.equal(fromOther.status, 201);
+
+  const toOther = await request(app).post('/api/transfers/create').set(auth(token)).send({
+    fromAccountId: cash.body.account._id,
+    recipientName: 'Jordan',
+    amount: 5000,
+    transactionDate: today,
+  });
+  assert.equal(toOther.status, 201);
+
+  const days = await request(app).get('/api/transfers/days?timezone=UTC&page=1&limit=10').set(auth(token));
+  assert.equal(days.status, 200);
+  assert.equal(days.body.data[0].count, 3);
+  assert.equal(days.body.data[0].addedAmount, 15000);
+  assert.equal(days.body.data[0].deductedAmount, 5000);
 });

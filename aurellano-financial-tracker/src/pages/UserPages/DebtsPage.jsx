@@ -14,6 +14,11 @@ import { afterSave, invalidateFamilies } from '../../query/cache';
 import { deleteDebtRequest, getDebtsRequest } from '../../services/api';
 import { formatDate, formatPeso } from '../../utils/format';
 
+const directionTabs = [
+  { id: 'receivable', label: 'Owed to you', value: 'RECEIVABLE' },
+  { id: 'payable', label: 'You owe', value: 'PAYABLE' },
+];
+
 const statusTabs = [
   { id: 'pending', label: 'Pending', value: 'PENDING' },
   { id: 'partially_paid', label: 'Partially paid', value: 'PARTIALLY_PAID' },
@@ -23,10 +28,21 @@ const statusTabs = [
 
 const emptyCounts = { PENDING: 0, PARTIALLY_PAID: 0, PAID: 0, OVERDUE: 0 };
 
+const buildSearchParams = ({ directionId, statusId }) => {
+  const next = {};
+  if (directionId === 'payable') next.direction = 'payable';
+  if (statusId !== 'pending') next.status = statusId;
+  return next;
+};
+
 const DebtsPage = () => {
   const { token } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const directionId = directionTabs.some((tab) => tab.id === searchParams.get('direction'))
+    ? searchParams.get('direction')
+    : 'receivable';
+  const direction = directionTabs.find((tab) => tab.id === directionId);
   const statusId = statusTabs.some((tab) => tab.id === searchParams.get('status'))
     ? searchParams.get('status')
     : 'pending';
@@ -37,15 +53,22 @@ const DebtsPage = () => {
   const [pageSize, setPageSize] = useState(10);
   const [actionError, setActionError] = useState('');
   const debtsQuery = useQuery({
-    queryKey: ['debts', 'page', { page, pageSize, status: status.value }],
+    queryKey: ['debts', 'page', { page, pageSize, status: status.value, direction: direction.value }],
     queryFn: () =>
-      getDebtsRequest(token, { page: page + 1, limit: pageSize, status: status.value }),
+      getDebtsRequest(token, {
+        page: page + 1,
+        limit: pageSize,
+        status: status.value,
+        direction: direction.value,
+      }),
     enabled: Boolean(token),
   });
   const debts = debtsQuery.data?.data ?? null;
   const total = debtsQuery.data?.total ?? 0;
   const counts = debtsQuery.data?.counts || emptyCounts;
   const error = actionError || debtsQuery.error?.message || '';
+  const newDebtTo =
+    directionId === 'payable' ? '/debts/new?direction=payable' : '/debts/new';
 
   const onDelete = async (debtId) => {
     const accepted = await confirm({
@@ -68,15 +91,45 @@ const DebtsPage = () => {
     }
   };
 
+  const emptyLabel =
+    directionId === 'payable'
+      ? Object.values(counts).every((count) => count === 0)
+        ? 'You have no payables yet.'
+        : `No ${status.label.toLowerCase()} payables.`
+      : Object.values(counts).every((count) => count === 0)
+        ? 'Nobody owes you money yet.'
+        : `No ${status.label.toLowerCase()} receivables.`;
+
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-primary-shade">Debts</h1>
-        <Link className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0" to="/debts/new" state={{ backgroundLocation: location }}>
+        <Link
+          className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0"
+          to={newDebtTo}
+          state={{ backgroundLocation: location }}
+        >
           New debt
         </Link>
       </div>
-      <p className="text-sm text-neutral-500">This is money other people owe you. It is separate from the cash in your accounts.</p>
+      <p className="text-sm text-neutral-500">
+        {directionId === 'payable'
+          ? 'Money you owe others. Payments come out of your accounts when you record them.'
+          : 'Money others owe you. It is separate from the cash in your accounts until you record a payment.'}
+      </p>
+      <Tabs
+        value={directionId}
+        tabs={directionTabs.map((tab) => ({
+          id: tab.id,
+          label: tab.label,
+        }))}
+        onChange={(id) => {
+          if (id === directionId) return;
+          setActionError('');
+          setPage(0);
+          setSearchParams(buildSearchParams({ directionId: id, statusId }));
+        }}
+      />
       <Tabs
         value={statusId}
         tabs={statusTabs.map((tab) => ({
@@ -87,20 +140,12 @@ const DebtsPage = () => {
           if (id === statusId) return;
           setActionError('');
           setPage(0);
-          setSearchParams(id === 'pending' ? {} : { status: id });
+          setSearchParams(buildSearchParams({ directionId, statusId: id }));
         }}
       />
       <ErrorText message={error} />
       {debtsQuery.isPending && !error && <Loading variant="cards" />}
-      {debts?.length === 0 && (
-        <Empty
-          label={
-            Object.values(counts).every((count) => count === 0)
-              ? 'Nobody owes you money yet.'
-              : `No ${status.label.toLowerCase()} debts.`
-          }
-        />
-      )}
+      {debts?.length === 0 && <Empty label={emptyLabel} />}
       <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {debts?.map((debt) => (
           <li key={debt._id} className="flex flex-col rounded-lg border border-neutral-200 bg-neutral-0 p-4 text-sm">

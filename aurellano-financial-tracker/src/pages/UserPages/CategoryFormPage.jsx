@@ -10,6 +10,7 @@ import { useFormErrorToast } from '../../hooks/useFormErrorToast';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { createCategoryRequest, getCategoryRequest, updateCategoryRequest } from '../../services/api';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, requiredText } from '../../utils/validate';
 
 const CategoryFormPage = () => {
@@ -17,6 +18,7 @@ const CategoryFormPage = () => {
   const editing = Boolean(id);
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const emptyForm = { name: '', type: 'EXPENSE', isActive: true };
   const [form, setForm] = useState(editing ? null : emptyForm);
@@ -48,6 +50,12 @@ const CategoryFormPage = () => {
     const nextErrors = { name: requiredText(form.name, 'Name', 2) };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    const accepted = await confirmSave({
+      title: editing ? 'Save category?' : 'Create category?',
+      message: editing ? 'This updates the category.' : 'This adds a new category for transactions.',
+      confirmLabel: editing ? 'Save changes' : 'Create category',
+    });
+    if (!accepted) return;
     setError('');
     try {
       await afterSave(async () => {

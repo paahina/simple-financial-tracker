@@ -21,12 +21,14 @@ import {
 } from '../../utils/accounts';
 import { categoryIdForDebt, categoryOptionValue, categoryOptions, payloadCategoryId } from '../../utils/debts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const PaymentEditPage = () => {
   const { id, paymentId } = useParams();
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
   const [baseline, setBaseline] = useState('');
@@ -34,15 +36,21 @@ const PaymentEditPage = () => {
   const [debtKind, setDebtKind] = useState('INDIVIDUAL');
   const [payers, setPayers] = useState([]);
   const [debtCategories, setDebtCategories] = useState([]);
-  const [incomeCategories, setIncomeCategories] = useState([]);
+  const [debtDirection, setDebtDirection] = useState('RECEIVABLE');
+  const [linkedCategories, setLinkedCategories] = useState([]);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   useFormErrorToast(error);
 
   useEffect(() => {
     let active = true;
-    Promise.all([getDebtRequest(id, token), getAccountsRequest(token), getCategoriesRequest(token, { type: 'INCOME' })])
-      .then(([detail, accountList, categories]) => {
+    Promise.all([
+      getDebtRequest(id, token),
+      getAccountsRequest(token),
+      getCategoriesRequest(token, { type: 'INCOME' }),
+      getCategoriesRequest(token, { type: 'EXPENSE' }),
+    ])
+      .then(([detail, accountList, incomeCategories, expenseCategories]) => {
         if (!active) return;
         const payment = detail.payments.find((item) => item._id === paymentId);
         if (!payment) {
@@ -50,10 +58,12 @@ const PaymentEditPage = () => {
           return;
         }
         setAccounts(selectableAccounts(accountList, [payment.accountId]));
+        const direction = detail.debt?.direction === 'PAYABLE' ? 'PAYABLE' : 'RECEIVABLE';
+        setDebtDirection(direction);
         setDebtKind(detail.debt?.kind || 'INDIVIDUAL');
         setPayers(detail.debt?.participants || []);
         setDebtCategories(detail.debt?.categories || []);
-        setIncomeCategories(categories);
+        setLinkedCategories(direction === 'PAYABLE' ? expenseCategories : incomeCategories);
         const nextForm = {
           accountId: payment.accountId,
           participantId: payment.participantId ? String(payment.participantId) : '',
@@ -65,9 +75,12 @@ const PaymentEditPage = () => {
           amount: fromCentavos(payment.amount),
           paymentDate: datetimeLocalInput(payment.paymentDate),
           notes: payment.notes || '',
-          recordAsIncome: Boolean(payment.transactionId),
+          recordAsIncome: direction === 'RECEIVABLE' && Boolean(payment.transactionId),
           incomeLabel: payment.income?.label || '',
           incomeCategoryId: payment.income?.categoryId || '',
+          recordAsExpense: direction === 'PAYABLE' && Boolean(payment.transactionId),
+          expenseLabel: payment.expense?.label || '',
+          expenseCategoryId: payment.expense?.categoryId || '',
         };
         setForm(nextForm);
         setBaseline(JSON.stringify(nextForm));
@@ -80,6 +93,8 @@ const PaymentEditPage = () => {
     };
   }, [id, paymentId, token]);
 
+  const isPayable = debtDirection === 'PAYABLE';
+
   const onSubmit = async (event) => {
     event.preventDefault();
     const nextErrors = {
@@ -91,11 +106,20 @@ const PaymentEditPage = () => {
         : '',
       amount: requiredAmount(form.amount),
       paymentDate: requiredChoice(form.paymentDate, 'Date'),
-      incomeLabel: form.recordAsIncome ? requiredText(form.incomeLabel, 'Income label') : '',
-      incomeCategoryId: form.recordAsIncome ? requiredChoice(form.incomeCategoryId, 'Income category') : '',
+      incomeLabel: !isPayable && form.recordAsIncome ? requiredText(form.incomeLabel, 'Income label') : '',
+      incomeCategoryId:
+        !isPayable && form.recordAsIncome ? requiredChoice(form.incomeCategoryId, 'Income category') : '',
+      expenseLabel: isPayable && form.recordAsExpense ? requiredText(form.expenseLabel, 'Expense label') : '',
+      expenseCategoryId:
+        isPayable && form.recordAsExpense ? requiredChoice(form.expenseCategoryId, 'Expense category') : '',
     };
     setFieldErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    const accepted = await confirmSave({
+      title: 'Save payment?',
+      message: 'This updates the payment and may adjust account balances.',
+    });
+    if (!accepted) return;
     setError('');
     try {
       await afterSave(async () => {
@@ -109,9 +133,12 @@ const PaymentEditPage = () => {
             amount: toCentavos(form.amount),
             paymentDate: datetimeLocalToIso(form.paymentDate),
             notes: form.notes,
-            recordAsIncome: form.recordAsIncome,
-            incomeLabel: form.recordAsIncome ? form.incomeLabel.trim() : undefined,
-            incomeCategoryId: form.recordAsIncome ? form.incomeCategoryId : undefined,
+            recordAsIncome: !isPayable && form.recordAsIncome,
+            incomeLabel: !isPayable && form.recordAsIncome ? form.incomeLabel.trim() : undefined,
+            incomeCategoryId: !isPayable && form.recordAsIncome ? form.incomeCategoryId : undefined,
+            recordAsExpense: isPayable && form.recordAsExpense,
+            expenseLabel: isPayable && form.recordAsExpense ? form.expenseLabel.trim() : undefined,
+            expenseCategoryId: isPayable && form.recordAsExpense ? form.expenseCategoryId : undefined,
           },
           token,
         );
@@ -134,7 +161,10 @@ const PaymentEditPage = () => {
     <form className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4" onSubmit={onSubmit}>
       <h1 className="pr-8 text-2xl font-semibold text-primary-shade">Edit payment</h1>
       <Field
-        label={accountLabelWithBalance('Money goes into', accountById(accounts, form.accountId))}
+        label={accountLabelWithBalance(
+          isPayable ? 'Money comes out of' : 'Money goes into',
+          accountById(accounts, form.accountId),
+        )}
         error={fieldErrors.accountId}
       >
         <Select
@@ -168,7 +198,7 @@ const PaymentEditPage = () => {
         value={form.subBalanceId}
         error={fieldErrors.subBalanceId}
         onChange={(subBalanceId) => setForm({ ...form, subBalanceId })}
-        label="Add to"
+        label={isPayable ? 'Deduct from' : 'Add to'}
       />
       <Field label="Amount (PHP)" error={fieldErrors.amount}>
         <input className={inputClass} required type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
@@ -179,32 +209,65 @@ const PaymentEditPage = () => {
       <Field label="Notes">
         <input className={inputClass} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
       </Field>
-      <label className="flex items-center gap-2 text-sm text-neutral-900">
-        <input
-          type="checkbox"
-          checked={form.recordAsIncome}
-          onChange={(event) => setForm({ ...form, recordAsIncome: event.target.checked })}
-        />
-        Also record as income
-      </label>
-      {form.recordAsIncome ? (
+      {isPayable ? (
         <>
-          <Field label="Income label" error={fieldErrors.incomeLabel}>
+          <label className="flex items-center gap-2 text-sm text-neutral-900">
             <input
-              className={inputClass}
-              value={form.incomeLabel}
-              onChange={(event) => setForm({ ...form, incomeLabel: event.target.value })}
+              type="checkbox"
+              checked={form.recordAsExpense}
+              onChange={(event) => setForm({ ...form, recordAsExpense: event.target.checked })}
             />
-          </Field>
-          <Field label="Income category" error={fieldErrors.incomeCategoryId}>
-            <Select
-              value={form.incomeCategoryId}
-              options={incomeCategories.map((category) => ({ value: category._id, label: category.name }))}
-              onChange={(incomeCategoryId) => setForm({ ...form, incomeCategoryId })}
-            />
-          </Field>
+            Also record as expense
+          </label>
+          {form.recordAsExpense ? (
+            <>
+              <Field label="Expense label" error={fieldErrors.expenseLabel}>
+                <input
+                  className={inputClass}
+                  value={form.expenseLabel}
+                  onChange={(event) => setForm({ ...form, expenseLabel: event.target.value })}
+                />
+              </Field>
+              <Field label="Expense category" error={fieldErrors.expenseCategoryId}>
+                <Select
+                  value={form.expenseCategoryId}
+                  options={linkedCategories.map((category) => ({ value: category._id, label: category.name }))}
+                  onChange={(expenseCategoryId) => setForm({ ...form, expenseCategoryId })}
+                />
+              </Field>
+            </>
+          ) : null}
         </>
-      ) : null}
+      ) : (
+        <>
+          <label className="flex items-center gap-2 text-sm text-neutral-900">
+            <input
+              type="checkbox"
+              checked={form.recordAsIncome}
+              onChange={(event) => setForm({ ...form, recordAsIncome: event.target.checked })}
+            />
+            Also record as income
+          </label>
+          {form.recordAsIncome ? (
+            <>
+              <Field label="Income label" error={fieldErrors.incomeLabel}>
+                <input
+                  className={inputClass}
+                  value={form.incomeLabel}
+                  onChange={(event) => setForm({ ...form, incomeLabel: event.target.value })}
+                />
+              </Field>
+              <Field label="Income category" error={fieldErrors.incomeCategoryId}>
+                <Select
+                  value={form.incomeCategoryId}
+                  options={linkedCategories.map((category) => ({ value: category._id, label: category.name }))}
+                  onChange={(incomeCategoryId) => setForm({ ...form, incomeCategoryId })}
+                />
+              </Field>
+            </>
+          ) : null}
+        </>
+      )}
       <Button type="submit">Save changes</Button>
     </form>
       )}

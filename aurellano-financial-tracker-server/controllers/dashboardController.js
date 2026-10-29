@@ -23,7 +23,7 @@ const getDashboard = async (req, res) => {
     const accounts = await Account.find({ userId, isActive: true }).sort({ name: 1 });
     const accountBalances = await Promise.all(
       accounts.map(async (account) => {
-        const balance = await balanceForAccount(account, { Transaction, Transfer, DebtPayment });
+        const balance = await balanceForAccount(account, { Transaction, Transfer, DebtPayment, Debt });
         return {
           id: account._id,
           name: account.name,
@@ -51,6 +51,7 @@ const getDashboard = async (req, res) => {
 
     let outstandingReceivables = 0;
     for (const debt of debts) {
+      if (debt.direction === 'PAYABLE') continue;
       const paid = await debtTotals(DebtPayment, debt._id);
       const state = debtState(owedAmount(debt), paid, debt.dueDate, now);
       outstandingReceivables += state.remaining;

@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Button, { EditLink } from '../../components/Button';
+import DayAmountSummary from '../../components/DayAmountSummary';
 import DayGroupList from '../../components/DayGroupList';
 import DayListDrawer from '../../components/DayListDrawer';
 import Pager from '../../components/Pager';
@@ -112,15 +113,15 @@ const TransactionsPage = () => {
           />
         </div>
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <Button variant="ghost" className="lg:hidden" onClick={() => setDaysOpen(true)}>
-                Days
-              </Button>
-              <h2 className="truncate text-lg font-semibold text-primary-shade">
-                {selectedDay ? formatDayKey(selectedDay.date) : 'Entries'}
-              </h2>
-            </div>
+          <div className="flex min-w-0 items-center gap-2">
+            <Button variant="ghost" className="lg:hidden" onClick={() => setDaysOpen(true)}>
+              Days
+            </Button>
+            <h2 className="truncate text-lg font-semibold text-primary-shade">
+              {selectedDay ? formatDayKey(selectedDay.date) : 'Entries'}
+            </h2>
+          </div>
+          <div className="flex justify-end">
             <Link
               className="rounded-md bg-primary px-4 py-2 text-sm text-neutral-0 hover:bg-primary-shade"
               to="/transactions/new"
@@ -129,6 +130,15 @@ const TransactionsPage = () => {
               New transaction
             </Link>
           </div>
+          {selectedDay ? (
+            <DayAmountSummary
+              variant="cards"
+              addedLabel="Added"
+              deductedLabel="Deducted"
+              addedAmount={selectedDay.addedAmount}
+              deductedAmount={selectedDay.deductedAmount}
+            />
+          ) : null}
           {dayLoading && <Loading variant="entries" />}
           {!dayLoading && selectedDay && entries.length === 0 && <Empty label="No entries on this day." />}
           {!dayLoading && entries.length > 0 && (

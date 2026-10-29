@@ -20,12 +20,14 @@ import {
   selectableAccounts,
 } from '../../utils/accounts';
 import { datetimeLocalInput, datetimeLocalToIso, fromCentavos, toCentavos } from '../../utils/format';
+import { useConfirmSave } from '../../hooks/useConfirmSave';
 import { hasErrors, requiredAmount, requiredChoice, requiredText } from '../../utils/validate';
 
 const TransferEditPage = () => {
   const { id } = useParams();
   const { token } = useAuth();
   const { notify } = useToast();
+  const confirmSave = useConfirmSave();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
   const [baseline, setBaseline] = useState('');
@@ -94,6 +96,11 @@ const TransferEditPage = () => {
       setError('Choose two different sub-balances');
       return;
     }
+    const accepted = await confirmSave({
+      title: 'Save transfer?',
+      message: 'This updates the transfer and your account balances.',
+    });
+    if (!accepted) return;
     setError('');
     try {
       await afterSave(async () => {
