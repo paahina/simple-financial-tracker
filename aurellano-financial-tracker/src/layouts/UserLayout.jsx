@@ -1,5 +1,6 @@
 import { matchPath, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { useRefreshLedgerAfterIdle } from '../hooks/useRefreshLedgerAfterIdle';
 import AccountsPage from '../pages/UserPages/AccountsPage';
 import CategoriesPage from '../pages/UserPages/CategoriesPage';
 import DebtDetailPage from '../pages/UserPages/DebtDetailPage';
@@ -68,6 +69,7 @@ const overlayBackground = (pathname, state) => {
 const UserLayout = () => {
   const location = useLocation();
   const background = overlayBackground(location.pathname, location.state);
+  useRefreshLedgerAfterIdle();
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900">

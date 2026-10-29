@@ -4,304 +4,96 @@ Working checklist for planned work. Stable specs live under docs/ (e.g.
 05_data_model.txt, 15_caching_rules.txt).
 
 ----------------------------------------------------------------------
-Shipped in codebase (v1 — do not re-implement)
+Shipped in codebase (do not re-implement)
 ----------------------------------------------------------------------
 
-[x] Account sub-balances (pockets), default Current pocket.
-[x] Transaction / transfer / debt payment pocket pickers; pocket deltas on save.
-[x] Debt payment optional linked INCOME (no double-count on account balance).
-[x] TanStack Query invalidation on debt payment create/edit.
-[x] Debt 1.1 — Individual labeled balance lines (additions); payments at debt level.
-[x] Debt 1.2 — Contribution (participants, equal split, per-payer payments, caps).
-[x] Individual balance “Add amount” (top-up on existing lines).
-[x] Form overlays — create/edit routes keep background screen (UserLayout + backgroundLocation).
-[x] 3.2 To-Buy list — CRUD, Done → Shopping expense, hard delete.
-[x] UX — balance beside account/pocket labels on forms; red error toasts on API save/load failures.
-[x] Dashboard — total balance summary (no removed protected/spendable split).
-
-[x] UX polish v2 — Select (2.3), save confirmations (2.5), table alignment (2.4), day panels + summary cards (2.2), accounts privacy (2.6), reports filters (2.7).
+[x] v1 — Accounts/pockets, debts, transactions, transfers, to-buy, overlays, TanStack Query invalidation on writes.
+[x] Session bootstrap — auto-retry `/api/users/session` on timeout/network (3×, 30s, backoff); 401 clears token.
+[x] UX polish v2 — 2.5 save confirm, 2.3 Select portal, 2.4 table spacers, 2.2 day cards, 2.6 accounts privacy,
+    2.7 reports filters, 2.1 debts receivable/payable + direction tabs (labels only on top row).
+[x] 3.1 — After 24h idle, invalidate ledger query families on return (no full page reload).
 
 ----------------------------------------------------------------------
-Agreed v2 build order
+Active build order
 ----------------------------------------------------------------------
 
-1. ~~2.5 — Save confirmation on all writes (except delete)~~ done
-2. ~~2.3 — Select menu escapes parent width; no clipping~~ done
-3. ~~2.4 — Desktop bulk-create tables: spacers + align-top + transfer “other” fields~~ done
-4. ~~2.6 — Hide amounts: sub-balances on Accounts page~~ done
-5. ~~2.7 — Reports month names + year picker~~ done
-6. ~~2.2 — Day panel layout + totals + right-panel summary cards~~ done
-7. ~~2.1 — Debts page: receivable vs payable + status tabs on each.~~ done
-8. ~~2.1 polish — Direction tabs: labels only (no counts); keep status-tab counts and API `directionTotals`.~~ done
+1. **3.1 — Return visit: refresh ledger data without `location.reload()`** [x]
 
-======================================================================
-2. v2 — UX, activity day totals, debts direction, reports
-======================================================================
+----------------------------------------------------------------------
+3. App reliability & fresh data
+----------------------------------------------------------------------
 
-### 2.1. Debts page — receivable vs payable (two directions)
+### 3.1. Return visit — refresh data without full page reload
 **Priority:** High | **Status:** [x]
 
-**Objective:** One Debts page with two top-level tabs:
-- **Tab A — Others owe you** (today’s default receivable list).
-- **Tab B — You owe others** (liabilities), same debt kinds and status workflow.
+**Problem (agreed):**
+- After not using the app for ~a day (tab in background, closed browser, or cold API on Render), users
+  can see stale dashboard/lists or wait on the session gate. We already **auto-retry session**; we do
+  **not** use `location.reload()`.
+- Goal: when the user comes back after **long idle**, **refetch ledger-related data in the SPA** so
+  balances and lists match the server without a hard browser refresh.
 
-**Model / API (agreed):**
-- Add a **direction** (or equivalent) on Debt: `RECEIVABLE` | `PAYABLE` (default RECEIVABLE for
-  existing rows — lazy backfill/migration in code).
-- **Kinds on both tabs:** `INDIVIDUAL` and `CONTRIBUTION` (same as today).
-- List/filter APIs accept direction + status; counts per status respect direction.
-- Paged list may include **`directionTotals`** (`RECEIVABLE` / `PAYABLE` debt counts) for future use;
-  **UI must not show these on the direction tabs** (see UI refinement).
-- **Receivable payments:** unchanged — money **into** account (+ pocket); optional record as income.
-- **Payable payments:** mirror — money **out of** account (+ pocket); optional linked **EXPENSE**
-  (same anti-double-count pattern as receivable income link).
-- Contribution payable: per-participant pay-down with caps; paying reduces user’s obligation to
-  that participant’s share.
+**Out of scope:**
+- `window.location.reload()` or forced full document reload.
+- Replacing session auto-retry in `AuthContext.jsx`.
+- Redis / server cache layer (see docs/15_caching_rules.txt — planned separately).
+- PersistQueryClient / offline cache (optional follow-up).
 
-**UI:**
-- Top tabs: **“Owed to you”** | **“You owe”** (exact labels match app tone).
-- **Each** top tab has the **same four status tabs:** Pending, Partially paid, Paid, Overdue
-  (reuse current status chips/filters; **status tabs keep per-status counts**).
-- Create debt: direction follows active top tab (or explicit toggle on create form).
-- Detail/edit/payment/add-balance flows work for both directions with correct cash sign.
-
-**UI refinement — direction tabs (agreed):**
-- Top-level direction tabs show **labels only** — **no** total debt count, parentheses, or badges
-  (e.g. not “Owed to you (3)”).
-- **Do not remove** status-tab counts (Pending 2, etc.).
-- **Do not remove** `directionTotals` from the API; client ignores it for direction tab labels.
-
-**Acceptance criteria:**
-- Existing receivable debts unchanged after migration.
-- Payable CRUD, payments, and status transitions correct; account balances update once.
-- No duplicate cash with optional linked transaction on payable payments.
-- Server tests for payable payment path and list filters by direction + status.
-- Direction tabs read as plain “Owed to you” / “You owe”; status row still shows counts.
-
----
-
-### 2.2. Transactions & Transfers — day panel layout and totals
-**Priority:** High | **Status:** [x]
-
-**Objective:** When a day is selected on Transactions and Transfers pages, the **right panel** layout:
-
-1. Date heading (unchanged formatting).
-2. **New transaction** / **New transfer** button — **below** date, **above** totals, **right-aligned**
-   (full width row, `justify-end`).
-3. **Two summary cards** for the selected day (see **UI refinement** below) — not small chips on the
-   right panel.
-4. Entry list and pager below.
-
-**UI refinement — right panel only (agreed):**
-- Replace `DayAmountSummary` **chips** on the **right panel** with **two large cards**, same pattern as
-  Dashboard summary tiles:
-  - `article` with `rounded-lg border border-neutral-200 bg-neutral-0 p-4`
-  - Label: `text-sm text-neutral-500`
-  - Amount: `Money` at `text-xl font-semibold` (respects navbar **hide amounts**)
-- **Layout:** two cards **side by side** (`grid grid-cols-2 gap-4` or `sm:grid-cols-2`).
-- **Always show both cards** for the selected day, including **₱0.00** when that side has no total
-  (do not hide zero cards on the right panel).
-- **Labels (page-specific):**
-  - **Transactions:** **Added** | **Deducted**
-  - **Transfers:** **Money in** | **Money out**
-- **UX tone:** distinguish in vs out — e.g. success/green styling on the “in/added” amount, destructive/red
-  on the “out/deducted” amount (card chrome stays Dashboard-neutral; accent on amount or subtle border).
-- **Left day list (`DayGroupList`):** keep **compact chips** for scanability (unchanged).
-
-**Day total rules — Transactions:**
-- **Added** = sum of `INCOME` amounts on that calendar day (user timezone, same as day grouping).
-- **Deducted** = sum of `EXPENSE` amounts on that day.
-
-**Day total rules — Transfers (agreed):**
-- **Added / Money in:** other → your account only (`fromAccountId` null, `toAccountId` set).
-- **Deducted / Money out:** your account → other only (`fromAccountId` set, `toAccountId` null).
-- **Internal** account ↔ account (including pockets): **0** on both sides (not counted).
+**Approach (agreed):**
+1. Track **last time the tab went hidden** (`visibilitychange` → hidden, plus `pagehide` as backup) in
+   `localStorage` (`tracker_last_hidden_at`).
+2. **Idle threshold:** 24 hours — if the user returns (tab visible again **or** authenticated shell mounts
+   and last hidden ≥ 24h ago), invalidate TanStack Query families used for money UI.
+3. **Invalidation:** reuse `invalidateFamilies` pattern — reset/refetch active queries for:
+   `dashboard`, `accounts`, `categories`, `transactions`, `transfers`, `debts`, `to-buy`, `reports`.
+4. Hook lives on authenticated shell (`UserLayout`) so guest/sign-in routes are unaffected.
+5. Keep default **`refetchOnWindowFocus`** behavior (React Query) for shorter idle; 24h path is the
+   explicit “was away a long time” safety net.
 
 **Implementation notes:**
-- Right-panel values from `selectedDay.addedAmount` / `deductedAmount` on the days API (full day, not
-  entry page slice).
-- Refactor or extend `DayAmountSummary` (e.g. `variant="chips" | "cards"`, label props) to avoid
-  duplicating Dashboard markup.
-- Left sidebar chips must stay consistent with the same API totals.
+- Constants in `src/query/cache.js`: `IDLE_REFRESH_MS`, `LAST_HIDDEN_STORAGE_KEY`, `refreshLedgerAfterIdle()`.
+- Hook: `src/hooks/useRefreshLedgerAfterIdle.js` — visibility + mount check; no UI spinner (queries show
+  existing skeletons while refetching).
+- Do not invalidate auth/session queries.
 
 **Acceptance criteria:**
-- Right panel shows two Dashboard-style cards with correct labels per page; zeros visible.
-- Hide amounts masks both card amounts; labels remain visible.
-- Transfer internal-only days: both cards show 0; external in/out match server rules.
-- Sidebar chips unchanged; totals match cards for the selected date.
+- No `location.reload()` added anywhere for this feature.
+- Tab hidden ≥ 24h then focused: active page data refetches (network tab shows GETs); UI updates without
+  manual browser refresh.
+- Idle &lt; 24h: no extra full-family reset beyond normal React Query focus/stale behavior.
+- Session cold start still uses existing retry skeleton; this change does not remove **Try again**.
+- Sign-in / guest routes do not run ledger invalidation.
 
-**Definition of done for 2.2 (full):** Mark `[x]` when cards + existing layout/total rules pass QA.
+**QA edge cases:**
+- Open app in two tabs; hidden time is shared via localStorage — both refresh when stale (acceptable).
+- User on form overlay mid-edit; refetch should not navigate away (only query data updates).
+- 401 on refetch still handled per existing API/auth flows.
 
 ---
 
-### 2.3. Select dropdown — overlay; ignore parent width bounds
-**Priority:** Medium | **Status:** [x]
+### Completed v2 specs (reference only — all [x])
 
-**Problem (agreed):**
-- Menu is **clipped** by narrow parents (table cells, `overflow-x-hidden` form/modal wrappers) even
-  though the list is portaled — options are not fully visible.
-- Earlier goal still applies: opening Select must **not** add a horizontal scrollbar on the form/page.
-
-**Scope:** Shared **`Select`** component everywhere (all pages).
-
-**Requirements:**
-- List renders in a **portal** (e.g. `document.body`) so it is **not** clipped by parent
-  `overflow: hidden/auto` or table cell width.
-- **Width:** `max(trigger width, content width for longest option label)` — menu may be **wider**
-  than the trigger when labels are long (e.g. account name + balance in table columns).
-- **Horizontal position:** **Left edge aligned with the trigger**; if the menu would extend past the
-  viewport right edge, **shift left** so it stays on screen (do not shrink below min width unless
-  viewport forces `max-width` with wrapping).
-- **Vertical:** keep flip above/below when near viewport edge; max height + scroll unchanged.
-- **z-index** above FormModal and form content; Escape and click-outside unchanged.
-- Parent layout must **not** grow or scroll horizontally when the menu opens (menu width is visual
-  only, not document flow).
-
-**Implementation notes:**
-- Measure option label widths (hidden probe or canvas) or use `minWidth: triggerWidth` +
-  `width: max-content` with viewport cap.
-- Do **not** tie list width solely to `getBoundingClientRect().width` of the trigger when that
-  causes clipped/truncated options.
-
-**Acceptance criteria:**
-- Transaction/transfer create on desktop: open Account/Category in a **narrow table column** — full
-  option labels visible; menu not cut off by modal border.
-- Menu at least as wide as trigger; wider when labels require it.
-- No horizontal scrollbar on form/modal when menu is open.
-- Other Select usages (accounts, categories, debts) behave the same.
-
-**Definition of done for 2.3:** Mark `[x]` again only when clipping + width rules above pass QA.
-
----
-
-### 2.4. Transaction & transfer create — desktop table row alignment
-**Priority:** Medium | **Status:** [x]
-
-**Problem (agreed):**
-- On **lg+** bulk-create tables, **Account** and **Sub-balance** cells show a **subtitle** above the
-  control (balance hint text). **Type**, **Category**, **Label**, **Amount**, and **Remove** do not,
-  so controls sit higher and rows look misaligned.
-- **`align-middle`** on the row does not fix this and can make multi-line **From/To** transfer cells
-  look worse. Alignment should be **top-based** with a consistent first-line offset.
-- **Transfer create (additional):** When **From other** or **To other** is selected, **Sender** /
-  **Recipient** text inputs appear **without** the invisible subtitle line that sub-balance **Select**
-  rows use, so those inputs sit higher than the equivalent stacked control in the opposite column.
-
-**Scope:** Desktop table layout only on:
-- `TransactionCreatePage` (multi-entry table)
-- `TransferCreatePage` (multi-entry table)
-
-Not in scope: mobile card carousel, single-row edit forms (`TransactionEditPage`, `TransferEditPage`).
-
-**Requirements (base — shipped):**
-- Table body rows: **`align-top`** (not **`align-middle`**).
-- Reuse **`TableSubtitleSpacer`** (invisible `text-xs` line, `aria-hidden`) above controls that must
-  align with Account/Sub-balance **Select** tops.
-- **Transaction create:** spacers on Type, Category, Label, Amount, Remove; spacer + “—” when no
-  sub-balance pockets.
-- **Transfer create:** spacers on **Amount** and **Remove** (with `mb-2` where From/To use `space-y-2`).
-
-**Requirements (refinement — pending):**
-- **Transfer create desktop table only**, inside **From** / **To** cells:
-  - When **`fromAccountId === 'other'`:** add **`TableSubtitleSpacer`** (same pattern as sub-balance
-    subtitle — invisible line **directly above** the **Sender** input) before the Sender field.
-  - When **`toAccountId === 'other'`:** same **directly above** the **Recipient** input.
-  - Do **not** add spacers to mobile card fields; do **not** change Sender/Recipient placeholders or validation.
-- Goal: Sender/Recipient inputs **line up vertically** with sub-balance **Select** stacks in the same
-  row (same offset as visible/invisible subtitle + control pattern).
-
-**Acceptance criteria:**
-- Desktop transaction create: primary controls in a row share the same vertical start (unchanged).
-- Desktop transfer create: Amount aligns with From account Select (unchanged).
-- Desktop transfer create with **From other** + account on To (or mirror): Sender and Recipient inputs
-  are not visually “jumped up” vs sub-balance selects on the other side.
-- Row alignment remains **top**; errors still below controls.
-
-**Definition of done for 2.4:** Mark `[x]` again when base + transfer “other” spacer QA pass.
-
----
-
-### 2.5. Confirmation before save (all writes except delete)
-**Priority:** Medium | **Status:** [x]
-
-**Scope (agreed):** Every **save/submit** that persists data, **except** actions that already use
-**delete** confirmation (delete keeps its own dialog).
-
-**Includes (non-exhaustive):** transaction create/edit, transfer create/edit, account create/edit,
-debt create/edit, debt payment, debt balance add, to-buy create/edit, to-buy Done → expense,
-category create/edit, user profile save — any `POST`/`PUT`/`PATCH` from a form primary action.
-
-**Requirements:**
-- Use existing `ConfirmProvider` / `useConfirm` pattern (title, message, confirm/cancel).
-- Submit runs only after user confirms; cancel returns to form with data intact.
-- Delete/deactivate flows: **do not** add a second confirm on top of existing delete confirm.
-
-**Acceptance criteria:**
-- Spot-check each major form once; no silent saves on primary button.
-- Double confirm does not appear on delete.
-
----
-
-### 2.6. Privacy — hide sub-balance amounts on Accounts
-**Priority:** Medium | **Status:** [x]
-
-**Problem:** Navbar “hide amounts” uses `Money` / privacy context; Accounts page still shows
-sub-balance lines with raw `formatPeso` (see Accounts list rendering).
-
-**Requirements:**
-- When privacy hide is on, **sub-balance amounts** on Accounts page are masked the same way as
-  other balances (reuse `Money` or shared privacy helper).
-- Labels (pocket names) remain visible.
-
-**Acceptance criteria:**
-- Toggle hide amounts: main account balance and every sub-balance line respect hide.
-- Toggle off: amounts visible again.
-
----
-
-### 2.7. Reports — month names and year selection
-**Priority:** Medium | **Status:** [x]
-
-**Page:** `ReportsPage` (Summary tab + Expenses tab month/year filters).
-
-**Requirements:**
-- **Month:** dropdown with full names **January … December** (not numeric month input).
-  Stored value remains 1–12 for API.
-- **Year:** prefer native HTML `<input type="number">` or `<select>` for year **if** it matches
-  theme; otherwise a **small themed control** consistent with `Select` / `Field` (same as month).
-- Changing month/year resets pagers on report sections (keep current behavior).
-
-**Acceptance criteria:**
-- Summary charts and expense list refetch for chosen month/year.
-- Accessible labels; no invalid month/year sent to API.
+Details for 2.1–2.7 remain in git history / prior backlog revisions. Shipped items:
+- **2.1** Debts direction RECEIVABLE/PAYABLE, status tabs, payable payments + linked expense.
+- **2.2** Day panel layout, summary cards, transfer day total rules.
+- **2.3** Select portal, width, viewport clamp.
+- **2.4** Bulk-create table `align-top`, `TableSubtitleSpacer`, transfer “other” fields.
+- **2.5** Save confirmation on writes (not delete).
+- **2.6** Accounts sub-balances respect hide amounts.
+- **2.7** Reports month names + year input.
 
 ======================================================================
-3. General implementation guidelines
+General implementation guidelines
 ======================================================================
 
 1. Inspect codebase first (models, finance.js, controllers, pages, tests).
-2. Extend working features; avoid destructive schema changes; backfill defaults for new enums.
-3. Amounts in centavos; validate payments and caps.
-4. Prevent duplicate accounting (linked income/expense, pocket deltas once).
-5. Match existing UI (FormModal, ConfirmProvider, Tabs, invalidateFamilies, Toast errors).
-6. Add/update server tests for new money paths and aggregates.
-7. Implement one backlog section at a time per agreed v2 order.
-
-**Core principle:** Available cash, receivables, and payables stay conceptually separate;
-future/owed money is not spendable cash unless product rules say otherwise.
+2. Amounts in centavos; prevent duplicate accounting on linked transactions.
+3. Match existing UI (FormModal, ConfirmProvider, Tabs, invalidateFamilies, Toast errors).
+4. Implement one backlog section at a time; do not commit unless the user asks.
 
 ======================================================================
-4. Definition of done (per feature)
+Agent workflow
 ======================================================================
 
-- UI workflow complete with loading/empty/error states.
-- Data persists across refresh.
-- Calculations and summaries correct (including day totals and direction-specific debt payments).
-- Tests pass; existing flows still work.
-
-======================================================================
-5. Agent workflow
-======================================================================
-
-Before coding a section: restate scope, resolve any open decisions for that section, then
-implement. Summarize files changed and QA steps when finished. Do not commit unless the user asks.
+Before coding: restate scope, resolve open decisions, then implement. Summarize files changed and QA
+steps when finished.
