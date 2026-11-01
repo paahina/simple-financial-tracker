@@ -12,12 +12,13 @@ Shipped in codebase (do not re-implement)
 [x] UX polish v2 — 2.5 save confirm, 2.3 Select portal, 2.4 table spacers, 2.2 day cards, 2.6 accounts privacy,
     2.7 reports filters, 2.1 debts receivable/payable + direction tabs (labels only on top row).
 [x] 3.1 — After 24h idle, invalidate ledger query families on return (no full page reload).
+[x] 3.2 — Debt overpayment allowed; overpaidAmount credit on receivable and payable payments.
 
 ----------------------------------------------------------------------
 Active build order
 ----------------------------------------------------------------------
 
-1. **3.1 — Return visit: refresh ledger data without `location.reload()`** [x]
+1. **3.2 — Debt overpayment & credit** [x]
 
 ----------------------------------------------------------------------
 3. App reliability & fresh data
@@ -68,6 +69,21 @@ Active build order
 - Open app in two tabs; hidden time is shared via localStorage — both refresh when stale (acceptable).
 - User on form overlay mid-edit; refetch should not navigate away (only query data updates).
 - 401 on refetch still handled per existing API/auth flows.
+
+---
+
+### 3.2. Debt overpayment & credit
+**Priority:** High | **Status:** [x]
+
+**Objective:** Allow debt payments **greater than remaining** (receivable and payable). Track excess as **overpaid credit**; full payment amount still moves cash (and optional linked income/expense).
+
+**Rules (agreed):**
+- Remove server caps that rejected `amount > remaining` (debt total, category slice, participant share).
+- `remainingAmount` floors at 0; `overpaidAmount` = max(0, paid − owed) on debt and on category/participant lines.
+- Status **PAID** when remaining is 0 (including overpay). Dashboard outstanding receivables uses remaining only.
+- Add-to-balance unchanged (increases amount owed, not a payment overpay).
+
+**UI:** Show “Overpaid by …” on list/detail when `overpaidAmount > 0`; payment forms do not block amounts above remaining.
 
 ---
 

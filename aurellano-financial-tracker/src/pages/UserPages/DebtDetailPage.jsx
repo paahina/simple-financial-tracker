@@ -11,7 +11,8 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { deleteDebtPaymentRequest, getAccountsRequest, getDebtRequest } from '../../services/api';
-import { formatDate, formatDateTime, formatPeso } from '../../utils/format';
+import Money from '../../components/Money';
+import { formatDate, formatDateTime } from '../../utils/format';
 
 const DebtDetailPage = () => {
   const { id } = useParams();
@@ -112,8 +113,13 @@ const DebtDetailPage = () => {
           </p>
           {debt.description?.trim() ? <p className="mt-2 font-semibold text-primary">{debt.description}</p> : null}
           <p className="mt-2">
-            Remaining {formatPeso(debt.remainingAmount)} of {formatPeso(debt.totalAmount)}
+            Remaining <Money centavos={debt.remainingAmount} /> of <Money centavos={debt.totalAmount} />
           </p>
+          {debt.overpaidAmount > 0 ? (
+            <p className="text-sm text-neutral-500">
+              Overpaid by <Money centavos={debt.overpaidAmount} />
+            </p>
+          ) : null}
         </div>
         <EditLink className="text-sm" to={`/debts/${id}/edit`}>
           Edit debt
@@ -155,7 +161,16 @@ const DebtDetailPage = () => {
                           <StatusChip status={payer.status} />
                         </span>
                       </span>
-                      <span>Remaining {formatPeso(payer.remainingAmount)} of {formatPeso(payer.amount)}</span>
+                      <span>
+                        Remaining <Money centavos={payer.remainingAmount} /> of{' '}
+                        <Money centavos={payer.amount} />
+                        {payer.overpaidAmount > 0 ? (
+                          <>
+                            {' '}
+                            · overpaid <Money centavos={payer.overpaidAmount} />
+                          </>
+                        ) : null}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -174,7 +189,15 @@ const DebtDetailPage = () => {
                           <StatusChip status={line.status} />
                         </span>
                       </span>
-                      <span>Remaining {formatPeso(line.remainingAmount)} of {formatPeso(line.amount)}</span>
+                      <span>
+                        Remaining <Money centavos={line.remainingAmount} /> of <Money centavos={line.amount} />
+                        {line.overpaidAmount > 0 ? (
+                          <>
+                            {' '}
+                            · overpaid <Money centavos={line.overpaidAmount} />
+                          </>
+                        ) : null}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -197,7 +220,8 @@ const DebtDetailPage = () => {
               {payments.map((payment) => (
                 <li key={payment._id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                   <span>
-                    {formatPeso(payment.amount)} into {nameOf(payment.accountId)}
+                    <Money centavos={payment.amount} />{' '}
+                    {debt.direction === 'PAYABLE' ? 'out of' : 'into'} {nameOf(payment.accountId)}
                     {payerNameOf(payment.participantId) ? ` · ${payerNameOf(payment.participantId)}` : ''}
                     {categoryNameOf(payment.categoryId) ? ` · ${categoryNameOf(payment.categoryId)}` : ''}
                     <span className="ml-2 text-neutral-500">{formatDateTime(payment.paymentDate)}</span>

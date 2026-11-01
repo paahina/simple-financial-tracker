@@ -165,21 +165,24 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
     amount: 310001,
     paymentDate: today,
   });
-  assert.equal(tooMuch.status, 400);
+  assert.equal(tooMuch.status, 201);
+  assert.equal(tooMuch.body.debt.remainingAmount, 0);
+  assert.equal(tooMuch.body.debt.overpaidAmount, 1);
+  assert.equal(tooMuch.body.debt.status, 'PAID');
 
   const accounts = await request(app).get('/api/accounts/getAllAccounts').set(auth(token));
   const cashBalance = accounts.body.find((item) => item.name === 'Cash').balance;
   const gcashBalance = accounts.body.find((item) => item.name === 'GCash').balance;
   assert.equal(cashBalance, 1275000);
-  assert.equal(gcashBalance, 400000);
+  assert.equal(gcashBalance, 710001);
 
   const dashboard = await request(app).get('/api/dashboard/get').set(auth(token));
   assert.equal(dashboard.status, 200);
-  assert.equal(dashboard.body.totalMoney, 1675000);
+  assert.equal(dashboard.body.totalMoney, 1985001);
   assert.equal(dashboard.body.monthlyIncome, 1000000);
   assert.equal(dashboard.body.monthlyExpenses, 25000);
   assert.equal(dashboard.body.monthlyNet, 975000);
-  assert.equal(dashboard.body.outstandingReceivables, 310000);
+  assert.equal(dashboard.body.outstandingReceivables, 0);
 
   const openDebt = await request(app).post('/api/debts/create').set(auth(token)).send({
     personName: 'No date',
@@ -235,7 +238,7 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
   assert.equal(limited.body.account.balance < limited.body.account.remainingBalance, true);
 
   const heldBack = await request(app).get('/api/dashboard/get').set(auth(token));
-  assert.equal(heldBack.body.totalMoney, 1685000);
+  assert.equal(heldBack.body.totalMoney, 1995001);
 
   const reserved = await request(app)
     .put(`/api/accounts/update/${limited.body.account._id}`)
@@ -243,7 +246,7 @@ test('daily money flow updates balances, dashboard, and reports', async () => {
     .send({ remainingBalance: 2000 });
   assert.equal(reserved.status, 200);
   const afterReserve = await request(app).get('/api/dashboard/get').set(auth(token));
-  assert.equal(afterReserve.body.totalMoney, 1685000);
+  assert.equal(afterReserve.body.totalMoney, 1995001);
 
   const cleared = await request(app)
     .put(`/api/accounts/update/${limited.body.account._id}`)
@@ -562,7 +565,10 @@ test('contribution payers split the total and payments stay on one payer', async
     amount: 501,
     paymentDate: today,
   });
-  assert.equal(tooMuch.status, 400);
+  assert.equal(tooMuch.status, 201);
+  const mariaAfter = tooMuch.body.debt.participants.find((item) => item.name === 'Maria');
+  assert.equal(mariaAfter.overpaidAmount, 1);
+  assert.equal(mariaAfter.remainingAmount, 0);
 
   const uneven = await request(app).post('/api/debts/create').set(auth(token)).send({
     personName: 'Uneven',
@@ -739,6 +745,18 @@ test('payable debts list separately and payments reduce account balance', async 
     incomeCategoryId: food._id,
   });
   assert.equal(badIncome.status, 400);
+
+  const overpay = await request(app).post('/api/debts/createPayment').set(auth(token)).send({
+    debtId: payable.body.debt._id,
+    accountId: cash.body.account._id,
+    subBalanceId: pocket,
+    amount: 8000,
+    paymentDate: new Date().toISOString(),
+  });
+  assert.equal(overpay.status, 201);
+  assert.equal(overpay.body.debt.remainingAmount, 0);
+  assert.equal(overpay.body.debt.overpaidAmount, 1000);
+  assert.equal(overpay.body.debt.status, 'PAID');
 });
 
 test('to-buy complete records an expense and delete does not', async () => {

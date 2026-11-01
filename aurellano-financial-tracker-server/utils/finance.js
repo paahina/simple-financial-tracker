@@ -317,11 +317,13 @@ const presentDebtCategories = (debt, payments = [], now = new Date()) => {
       unallocated -= take;
     }
     const remaining = Math.max(0, line.amount - paid);
+    const overpaidAmount = Math.max(0, paid - line.amount);
     const state = debtState(line.amount, paid, line.dueDate, now);
     return {
       ...line,
       paidAmount: paid,
       remainingAmount: remaining,
+      overpaidAmount,
       status: remaining === 0 ? 'PAID' : state.status,
     };
   });
@@ -403,6 +405,7 @@ const presentParticipants = (debt, payments = [], now = new Date()) =>
       .filter((payment) => payment.participantId && String(payment.participantId) === String(participant._id))
       .reduce((sum, payment) => sum + Number(payment.amount), 0);
     const remaining = Math.max(0, Number(participant.amount) - paid);
+    const overpaidAmount = Math.max(0, paid - Number(participant.amount));
     const state = debtState(participant.amount, paid, debt.dueDate, now);
     return {
       id: participant._id,
@@ -410,6 +413,7 @@ const presentParticipants = (debt, payments = [], now = new Date()) =>
       amount: Number(participant.amount),
       paidAmount: paid,
       remainingAmount: remaining,
+      overpaidAmount,
       status: remaining === 0 ? 'PAID' : paid > 0 ? 'PARTIALLY_PAID' : state.status,
     };
   });
@@ -467,6 +471,7 @@ const normalizeDebtCategories = (items) => {
 
 const debtState = (originalAmount, paidAmount, dueDate, now = new Date()) => {
   const remaining = Math.max(originalAmount - paidAmount, 0);
+  const overpaidAmount = Math.max(paidAmount - originalAmount, 0);
   let status = 'PENDING';
   if (remaining === 0) {
     status = 'PAID';
@@ -475,7 +480,7 @@ const debtState = (originalAmount, paidAmount, dueDate, now = new Date()) => {
   } else if (paidAmount > 0) {
     status = 'PARTIALLY_PAID';
   }
-  return { remaining, status };
+  return { remaining, overpaidAmount, status };
 };
 
 const categoryTotals = async (Transaction, Category, match) => {

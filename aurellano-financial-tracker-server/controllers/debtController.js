@@ -8,14 +8,12 @@ const { isPaged, slicePage } = require('../utils/pagination');
 const {
   FinanceError,
   applySubBalanceDelta,
-  categoryRemaining,
   debtState,
   debtTotals,
   effectiveDebtDueDate,
   normalizeDebtCategories,
   normalizeParticipants,
   owedAmount,
-  participantRemaining,
   presentDebtCategories,
   presentParticipants,
   requireOwnedAccount,
@@ -43,6 +41,7 @@ const presentDebt = async (debt) => {
   plain.paidAmount = paid;
   plain.totalAmount = total;
   plain.remainingAmount = state.remaining;
+  plain.overpaidAmount = state.overpaidAmount;
   plain.status = state.status;
   plain.categories = categories;
   plain.participants = presentedParticipants;
@@ -532,23 +531,9 @@ const createDebtPayment = async (req, res) => {
   try {
     const debt = await requireDebt(req.user.id, req.body.debtId);
     const account = await requireOwnedAccount(Account, req.user.id, req.body.accountId, { active: true });
-    const paid = await debtTotals(DebtPayment, debt._id);
-    const remaining = owedAmount(debt) - paid;
     const amount = Number(req.body.amount);
-    if (amount > remaining) {
-      throw new FinanceError('Payment cannot be greater than the remaining debt');
-    }
     const categoryId = resolveCategoryId(debt, req.body.categoryId || null);
     const participantId = resolveParticipantId(debt, req.body.participantId || null);
-    const payments = await DebtPayment.find({ debtId: debt._id, userId: debt.userId }).select(
-      'amount categoryId participantId',
-    );
-    if (amount > categoryRemaining(debt, payments, categoryId)) {
-      throw new FinanceError('Payment cannot be greater than the remaining balance');
-    }
-    if (participantId && amount > participantRemaining(debt, payments, participantId)) {
-      throw new FinanceError('Payment cannot be greater than this payer\'s remaining share');
-    }
     const subBalanceId = resolvePocketId(account, req.body.subBalanceId || null);
     assertRecordAsFlags(debt, req.body);
     await applyPaymentPocket(account, subBalanceId, debt, amount);
@@ -606,30 +591,14 @@ const updateDebtPayment = async (req, res) => {
     const nextAccount = sameAccount
       ? oldAccount
       : await requireOwnedAccount(Account, req.user.id, nextAccountId, { active: true });
-    const paid = await debtTotals(DebtPayment, debt._id);
     const oldAmount = Number(payment.amount);
     const nextAmount = req.body.amount !== undefined ? Number(req.body.amount) : oldAmount;
-    const remainingWithoutThis = owedAmount(debt) - (paid - oldAmount);
-    if (nextAmount > remainingWithoutThis) {
-      throw new FinanceError('Payment cannot be greater than the remaining debt');
-    }
     const requestedCategory =
       req.body.categoryId !== undefined ? req.body.categoryId || null : payment.categoryId;
     const nextCategoryId = resolveCategoryId(debt, requestedCategory);
     const requestedParticipant =
       req.body.participantId !== undefined ? req.body.participantId || null : payment.participantId;
     const nextParticipantId = resolveParticipantId(debt, requestedParticipant);
-    const others = await DebtPayment.find({
-      debtId: debt._id,
-      userId: debt.userId,
-      _id: { $ne: payment._id },
-    }).select('amount categoryId participantId');
-    if (nextAmount > categoryRemaining(debt, others, nextCategoryId)) {
-      throw new FinanceError('Payment cannot be greater than the remaining balance');
-    }
-    if (nextParticipantId && nextAmount > participantRemaining(debt, others, nextParticipantId)) {
-      throw new FinanceError('Payment cannot be greater than this payer\'s remaining share');
-    }
     const requestedPocket =
       req.body.subBalanceId !== undefined
         ? req.body.subBalanceId || null

@@ -12,7 +12,8 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import { afterSave, invalidateFamilies } from '../../query/cache';
 import { deleteDebtRequest, getDebtsRequest } from '../../services/api';
-import { formatDate, formatPeso } from '../../utils/format';
+import Money from '../../components/Money';
+import { formatDate } from '../../utils/format';
 
 const directionTabs = [
   { id: 'receivable', label: 'Owed to you', value: 'RECEIVABLE' },
@@ -159,8 +160,13 @@ const DebtsPage = () => {
             </p>
             {debt.description?.trim() ? <p className="mt-2 font-semibold text-primary">{debt.description}</p> : null}
             <p className="mt-2">
-              Remaining {formatPeso(debt.remainingAmount)} of {formatPeso(debt.totalAmount)}
+              Remaining <Money centavos={debt.remainingAmount} /> of <Money centavos={debt.totalAmount} />
             </p>
+            {debt.overpaidAmount > 0 ? (
+              <p className="text-sm text-neutral-500">
+                Overpaid by <Money centavos={debt.overpaidAmount} />
+              </p>
+            ) : null}
             <span className="mt-3 flex flex-wrap items-center gap-2">
               <Link className="text-primary-shade underline" to={`/debts/${debt._id}?tab=payments`}>
                 Payments
