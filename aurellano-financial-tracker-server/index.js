@@ -75,6 +75,11 @@ app.get('/', (_req, res) => {
   res.json({ message: 'Server is running' });
 });
 
+/** Render / UptimeRobot keep-alive: no DB, minimal work */
+app.get('/health', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
 app.use('/api/users', userRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/categories', categoryRoutes);
